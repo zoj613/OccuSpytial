@@ -20,7 +20,7 @@ setup(
     long_description=long_description,
     long_description_content_type="text/markdown",
     license='BSD',
-    url="https://github.com/RedRuM-613/OccuSpytial",
+    url="https://github.com/zoj613/OccuSpytial",
     install_requires = [
         'loky', 'matplotlib', 'pandas',
         'pypolyagamma', 'scipy',  # 'scikit-sparse' (optional)
@@ -28,6 +28,8 @@ setup(
     packages=find_packages(),
     include_package_data=True,
     classifiers=[
+        'Programming Language :: Python :: 2.7'
+        'Programming Language :: Python :: 3.5'
         'Programming Language :: Python :: 3.6',
         'Development Status :: 3 - Alpha',
         'Environment :: Console',
