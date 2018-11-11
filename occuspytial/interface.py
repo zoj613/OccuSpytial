@@ -91,12 +91,8 @@ class Sampler(object):
         
             
     def run(self, iters=1000, burnin=None, new_init=None, progressbar=True):
-        # choose appropriate executor for python 3 minor version
-        if sys.version_info[:2] >= (3, 7):
-	    from concurrent.futures import ProcessPoolExecutor
-            executor = ProcessPoolExecutor(max_workers = cpu_count())
-        else:
-            executor = get_reusable_executor(max_workers=cpu_count())
+	
+	executor = get_reusable_executor(max_workers=cpu_count())
 
         if new_init is not None:
             self._new_inits(new_init)
