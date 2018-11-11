@@ -35,6 +35,7 @@ import numpy as np
 from pandas import DataFrame
 from scipy.linalg import eigh, inv, solve_triangular as tri_solve
 from scipy.sparse import csc_matrix
+from scipy.sparse.linalg import splu
 from scipy.special import expit  # inverse logit
 from pypolyagamma import PyPolyaGamma
 
@@ -72,10 +73,11 @@ class ICAR(MCMCModelBase):
             P = -self.X.dot(XTX_inv).dot(self.X.T)
             P[np.diag_indices(self._n)] += 1
             # above 2 lines equivalent to: I - X @ XTX @ XT
-            A = -Q
-            A[np.diag_indices(self._n)] = 0
+            A = csc_matrix(Q)
+            A.data = -A.data
+            A.setdiag(np.zeros(self._n))
             #A = -self.Q + np.diag(np.diag(self.Q))
-            Omega = self._n * (P.dot(A).dot(P)) / A.sum()
+            Omega = self._n * P.dot(A.dot(P)) / A.sum()
             # return eigen vectors of Omega and keep first q columns
             # corresponding to the q largest eigenvalues of Omega greater
             # than the specified threshold
@@ -85,7 +87,7 @@ class ICAR(MCMCModelBase):
             assert q > 0, "Threshold is set too high. Please lower it."
             print("dimension reduced from {0}->{1}".format(Q.shape[0], q))
             self._K = v[:,:q]  # keep first q eigenvectors of ordered eigens
-            self.Minv = self._K.T.dot(Q).dot(self._K)
+            self.Minv = self._K.T.dot(csc_matrix(Q).dot(self._K))
             self._Ks = self._K[:self._s] # K sub-matrix for surveyed sites
             self.Q = self.Minv # replace Q with Minv in the underlying ICAR
             self._shape = q #set new shape parameter using the _shape method
@@ -133,30 +135,20 @@ class ICAR(MCMCModelBase):
 
         try:
             temp = L.solve_L(np.column_stack((s, self._ones)))
-            zw = L.solve_Lt(temp)
-            a = zw.sum(axis=0)
-            a = a[0] / a[1]
-            s = s - a * self._ones
-            temp = L.solve_L(s)
-            self._eta = L.solve_Lt(temp)
+            xz = L.solve_Lt(temp)
 
         except AttributeError:
             
-            zw = splu(
+            xz = splu(
                 prec, 
                 permc_spec='MMD_AT_PLUS_A', 
                 options=dict(SymmetricMode=True)
             ).solve(np.column_stack((s, self._ones)))
-            
-            a = zw.sum(axis=0)
-            a = a[0] / a[1]
-            s = s - a * self._ones
-            
-            self._eta = splu(
-                prec, 
-                permc_spec='MMD_AT_PLUS_A', 
-                options=dict(SymmetricMode=True)
-            ).solve(s)
+
+        finally:
+            a = xz.sum(axis=0)
+            a = -a[0] / a[1]
+            self._eta = xz[:, 0] + a * xz[:, 1]
 
     def _theta_update(self):
 
