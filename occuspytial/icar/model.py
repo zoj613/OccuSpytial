@@ -130,19 +130,33 @@ class ICAR(MCMCModelBase):
         prec.setdiag(prec.diagonal() + self._omega_b)
         b = self._k - self._omega_b * self.X.dot(self._beta)
         s, L = affine_sample(b, prec, return_factor=True)
-        v = -s.sum() / self._omega_b.sum()
-        t = s + v * self._omega_b
+
         try:
-            x = L.solve_L(t)
-            self._eta = L.solve_Lt(x)
+            temp = L.solve_L(np.column_stack((s, self._ones)))
+            zw = L.solve_Lt(temp)
+            a = zw.sum(axis=0)
+            a = a[0] / a[1]
+            s = s - a * self._ones
+            temp = L.solve_L(s)
+            self._eta = L.solve_Lt(temp)
 
         except AttributeError:
+            
+            zw = splu(
+                prec, 
+                permc_spec='MMD_AT_PLUS_A', 
+                options=dict(SymmetricMode=True)
+            ).solve(np.column_stack((s, self._ones)))
+            
+            a = zw.sum(axis=0)
+            a = a[0] / a[1]
+            s = s - a * self._ones
             
             self._eta = splu(
                 prec, 
                 permc_spec='MMD_AT_PLUS_A', 
                 options=dict(SymmetricMode=True)
-            ).solve(t)
+            ).solve(s)
 
     def _theta_update(self):
 
@@ -221,16 +235,14 @@ class ICAR(MCMCModelBase):
             check_finite=False
         )
 
-    #@profile
     def _z_update(self, vec):
-        # fastest without suign armadillo prod() function
+
         occ = expit(self.X[self.not_obs].dot(self._beta) + vec[self.not_obs])
         omd = 1 / (1 + np.exp(self._W_.dot(self._alpha)))
-        # calculate the numerator product for each site i \
+        # calculate the numerator product for each site i 
         # in the expression for the probability of z=1 | y=0
-        #_num_product(omd, occ, self.not_obs, self._V, self._probs)
+        # _num_prod stores the product on the object self._probs.
         _num_prod(omd, occ, self.not_obs, self.no_size, self._V, self._probs)
-        # _num_product stores the product on the object self._probs.
         # use the stored values to calculate the probability
         self._probs = self._probs / (1 - occ + self._probs)
         # update the occupancy state array by sampling from a Bernoulli with \

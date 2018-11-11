@@ -46,7 +46,7 @@ simplefilter('ignore', UserWarning)
 plt.style.use('ggplot')
 
 
-class Sampler:
+class Sampler(object):
     """ Class doc """
     
     def __init__(self, X, W, y, Q, INIT, HYPERS, model='icar', 
