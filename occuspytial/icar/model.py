@@ -208,8 +208,7 @@ class ICAR(MCMCModelBase):
         omega = self._omega_b[:self._s]
         b_mu, b_prec = self.hypers["b_mu"], self.hypers["b_prec"]
         prec = np.dot(self.Xs.T * omega, self.Xs) + b_prec
-        b = np.dot(self.Xs.T, self._k[:self._s] - omega * vec[:self._s]) +\ 
-            np.dot(b_prec, b_mu)
+        b = np.dot(self.Xs.T, self._k[:self._s] - omega * vec[:self._s]) + np.dot(b_prec, b_mu)
         prec_beta, L = affine_sample(b, prec, return_factor=True)  
         x = tri_solve(
             L, 
