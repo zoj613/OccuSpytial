@@ -1,14 +1,14 @@
 OccuSpytial
 -----------
 
-A package for fast bayesian analysis of spatial occupancy models. OccuSpytial implements an efficient Gibbs Sampler for the single season site spatial occupancy model using the Intrinsic Conditional Autoregressive (ICAR) model for spatial random effects. The Gibbs sampler is made possible by using Polya-Gamma data-augmentation to obtain closed form expressions for the full conditional distributions of the parameters of interest.
+A package for fast bayesian analysis of spatial occupancy models. OccuSpytial implements an efficient Gibbs Sampler for the single season site spatial occupancy model using the Intrinsic Conditional Autoregressive (ICAR) model for spatial random effects. The Gibbs sampler is made possible by using Polya-Gamma data-augmentation to obtain closed form expressions for the full conditional distributions of the parameters of interest when using the logit link function to model the occupancy and detection probabilities. Multiple chains of the Gibbs sampler are ran in parallel, and the sparsity properties of the spatial random effects are taken advantage of in order to boost
 
 Installation
 ------------
 currently this package can be installed by downloading the repository and running the following command on the folder with the package:
 ::
   python setup.py install --user
-
+It is strongly recommended that you have the package :math:`scikit-sparse` installed before using this package in order to fully take advantage of the speed gains possible. Using this package with math:`scikit-sparse` installed can result in sampler speedups of roughly 14 times or more.
 
 Usage
 -----
@@ -57,3 +57,8 @@ The initializing `Sampler` class accepts:
     >>> icarmodel.trace_plots(show=True) # display the traceplots of the parameters alpha, beta, and tau.
     >>> icarmodel.corr_plots(show=True) # display the correlation plots of the parameters alpha, beta, and tau.
     
+TO DO
+-----
+* Add a folder with dummy data
+* Add a function that simulates the ICAR precision matrix given any total site number.
+* Add more novel spatial occupancy models
