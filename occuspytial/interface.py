@@ -179,7 +179,7 @@ class Sampler(object):
             M = self.n_chains  # number of chains
             N = s[0].shape[0] # length of each chain (assume all are of equal length)
             # squared differences of each chain
-            sqd = [(s[i].mean(axis=0) - chains.mean(axis=0))**2 for i in range(M)]
+            sqd = [(s[i].mean(axis=0) - chain.mean(axis=0))**2 for i in range(M)]
             # calculate the between chains variances for each parameter
             B = np.stack(sqd).sum(axis=0) * s[0].shape[0] / (len(s) - 1)
             
