@@ -91,8 +91,8 @@ class Sampler(object):
         
             
     def run(self, iters=1000, burnin=None, new_init=None, progressbar=True):
-	
-	executor = get_reusable_executor(max_workers=cpu_count())
+
+        executor = get_reusable_executor(max_workers=cpu_count())
 
         if new_init is not None:
             self._new_inits(new_init)
