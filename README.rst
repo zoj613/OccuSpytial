@@ -17,7 +17,7 @@ The initializing `Sampler` class accepts:
 * a 2-D numpy array :math:`X` (occupancy effects design matrix).
 * a python dictionary object :math:`W` (each key-value entry is the site number and detection effects design matrix for that particular site ).
 * a python dictionary object :math:`y` (each key-value entry is the site number and an array containing the detection/non-detection info of that particular site).
-* a 2-D numpy / sparse-matrix :math: `Q` (the ICAR model precision matrix).
+* a 2-D numpy / sparse-matrix :math:`Q` (the ICAR model precision matrix).
 * Only 2 models are supported currently, namely ICAR and RSR (Reduced Spatial Regression).
 ::
     >>> from occuspytial.interface import Sampler
