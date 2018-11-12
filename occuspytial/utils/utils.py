@@ -36,6 +36,7 @@ import sys, time
 import numpy as np
 from numpy.random import standard_normal as std_norm
 from scipy.linalg import cholesky as chol
+from scipy.sparse import issparse
 try:
     from sksparse.cholmod import cholesky as sp_chol
 except ImportError:
