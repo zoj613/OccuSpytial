@@ -45,6 +45,7 @@ The initializing `Sampler` class accepts:
     # keep only the last 300 iterations from each of the 3 chains to form a chain with 900 samples per parameter.
     # progressbar=True is set so that the progress bar can be shown while the sampler is running.
     >>> icarmodel.run(iters=100000, burnin=99700, progressbar=True)
+        100.0%[█████████████████████████] 100000/100000 [0:14:27<0:00:00, 115.21draws/s]
     # print the summary table containing the posterior estimates of the parameters, their standard errors and convergence diagnostics info
     >>> print(icarmodel.summary())
                         mean       std      2.5%     97.5%      R_hat  Geweke_score
