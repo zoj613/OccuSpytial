@@ -7,8 +7,11 @@ Installation
 ------------
 currently this package can be installed by downloading the repository and running the following command on the folder with the package:
 ::
-  python setup.py install --user
-It is strongly recommended that you have the package :math:`scikit-sparse` installed before using this package in order to fully take advantage of the speed gains possible. Using this package with math:`scikit-sparse` installed can result in sampler speedups of roughly 14 times or more.
+  git clone https://github.com/zoj613/OccuSpytial.git
+  cd OccuSpytial
+  python setup.py install
+  
+It is strongly recommended that you have the package :math:`scikit-sparse` installed before using this package in order to fully take advantage of the speed gains possible. Using this package with :math:`scikit-sparse` installed can result in sampler speedups of roughly 14 times or more.
 
 Usage
 -----
@@ -60,6 +63,8 @@ The initializing `Sampler` class accepts:
     
 TO DO
 -----
-* Add a folder with dummy data
+* Add a folder with dummy data and a tutorial notebook.
+* Figure out how to display the progress bar while using this package inside ipython / ipython-notebook / jupyter-console.
 * Add a function that simulates the ICAR precision matrix given any total site number.
-* Add more novel spatial occupancy models
+* Add more novel spatial occupancy models.
+* 
