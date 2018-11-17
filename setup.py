@@ -22,8 +22,7 @@ setup(
     license='BSD',
     url="https://github.com/zoj613/OccuSpytial",
     install_requires = [
-        'loky', 'matplotlib', 'pandas',
-        'pypolyagamma', 'scipy',  # 'scikit-sparse' (optional)
+        'loky', 'pandas','pypolyagamma',  # 'scikit-sparse' (optional)
     ],
     packages=find_packages(),
     include_package_data=True,
