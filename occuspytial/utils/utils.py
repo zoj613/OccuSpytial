@@ -117,3 +117,76 @@ class CustomDict(dict):
         return np.concatenate(tuple(out))
         
 
+class SpatialStructure(object):
+    """ A class intended for generating spatial precision matrix used in 
+    models like CAR, ICAR and RSR"""
+    
+    def __init__ (self, n):
+        """ Class initialiser """
+        self.n = n
+        self.lat = None
+        self.A = None
+        
+    def _create_rand_lattice(self, n=None):
+        """ Function doc """
+        if n is not None:
+            a = n
+        else:
+            a = self.n
+
+        b = np.arange(1, a + 1)
+        c = b[a % b == 0][1:-1]  # multiplicative factors of n except for 1
+        d = []
+        for i in c:
+            out = c[i * c == a][0]  # factor whose product with i equals a
+            d.append((i, out))
+        
+        d = d[-(a // 2):]  # remove duplicate pairs
+        factors = d[np.random.randint(0,len(d))]  # randomly select one element
+        # create a lattice rectangular grid of dimensions factors[0] x factors[1]
+        lattice = np.arange(1, a + 1).reshape(factors)
+        self.lat = lattice
+    
+    def _neighbor_indx(self, indx, n_type=4):
+        """ Function doc """
+        assert n_type in [4, 8], "n_type must be 4 or 8"
+        out = []
+        
+        if n_type == 8:
+            out.append((indx[0] - 1, indx[1] - 1))  # north west
+            out.append((indx[0] + 1, indx[1] - 1))  # south west
+            out.append((indx[0] - 1, indx[1] + 1))  # north east
+            out.append((indx[0] + 1, indx[1] + 1))  # south east
+        
+        out.append((indx[0], indx[1] - 1))
+        out.append((indx[0], indx[1] + 1))
+        out.append((indx[0] - 1, indx[1]))
+        out.append((indx[0] + 1, indx[1]))
+
+        return out
+    
+    def _adjacency_matrix(self):
+        """ use the generated lattice to create an adjacency matrix A, where
+        an element A[i, j] = 1 if i and j are neighbors and A[i, j] = 0 
+        otherwise for i =/= j. A[i, i] = 0 for all i."""
+        A = np.zeros((self.n, self.n))
+        for indx, site in np.ndenumerate(self.lat):
+            A[site - 1, site - 1] = 0 
+            # randomly decide the maximum number of neighbors for site.
+            type_of_neighbor = np.random.choice([4, 8], p=[0.5, 0.5])
+            neighbor_indx = self._neighbor_indx(indx, type_of_neighbor)
+            for row, col in neighbor_indx:
+                try:
+                    neighbor_site = self.lat[row, col]
+                    A[site - 1, neighbor_site - 1] = 1
+                    A[neighbor_site - 1, site - 1] = 1
+                except IndexError:
+                    continue
+        self.A = A
+            
+    def spatial_precision(self, rho=1):
+        """ Function doc """
+        self._create_rand_lattice()
+        self._adjacency_matrix()
+        D = np.diag(self.A.sum(axis=0))
+        return D - rho * self.A
