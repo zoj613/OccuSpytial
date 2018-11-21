@@ -210,12 +210,10 @@ class Sampler(object):
     @property
     def summary(self):
         
-        table = BeautifulTable()
-        table.column_headers = [
-            'param', 'est. mean', 'std error', 'cred. 2.5%', 'cred. 97.5%', 'PSRF', 'geweke stat'
-        ]
+        table = BeautifulTable(default_alignment=BeautifulTable.ALIGN_RIGHT)
+        table.column_headers = ['param', 'mean', 'std', '2.5%', '97.5%', 'PSRF', 'geweke']
         table.set_style(BeautifulTable.STYLE_NONE)
-        
+
         fullchain = self.fullchain[1:].astype(np.float64)
         rhat = self.gelman(fullchain)
         gewe = self.geweke(fullchain)
