@@ -34,13 +34,15 @@ from multiprocessing import cpu_count
 import sys
 from warnings import simplefilter
 
+from beautifultable import BeautifulTable
 from loky import get_reusable_executor
 import matplotlib.pyplot as plt
 import numpy as np
-from pandas import DataFrame, concat, Series
 from scipy.signal import welch as specdensity
+from scipy.stats import gaussian_kde
 
 from .icar.model import ICAR
+from .utils.utils import acf
 
 simplefilter('ignore', UserWarning)
 plt.style.use('ggplot')
@@ -63,7 +65,8 @@ class Sampler(object):
         else:
             raise Exception("model choice can only be 'icar' or 'rsr'")
         self._names = self.model._names
-        self.fullchain = DataFrame()
+        self.fullchain = np.array(self._names, ndmin=2)
+
 
     def _new_inits(self, init):
         """ Function doc """
@@ -102,68 +105,55 @@ class Sampler(object):
         for i in range(self.n_chains):
             out = next(results)
             setattr(Sampler, 'chain{}'.format(i), out)
-            self.fullchain = self.fullchain.append(out, ignore_index=True)
+            self.fullchain = np.concatenate((self.fullchain, out))
 
 
-    def trace_plots(self, traces=None, show=True):
-        # use the instance's traces attribute if no traces are given as input
-        if traces is None:
-            traces = self.fullchain
+    def trace_plots(self, show=True, save=False):
 
+        traces = self.fullchain
         plot_rows = traces.shape[1]
         plt.figure(figsize=(6, 8))
         for i in range(plot_rows):
-                data = traces[traces.columns[i]]
-                plt.subplot(plot_rows, 2, 2*i + 1)
-                data.plot()
-                plt.title(traces.columns[i])
-                plt.subplot(plot_rows, 2, 2*i + 2)
-
-                Series(data).plot(
-                    kind='kde',
-                    linewidth=2,
-                    xlim=(data.min() - 0.01, data.max() + 0.01),
-                )
-                Series(data).plot(
-                    kind='hist',
-                    bins=55,
-                    facecolor='red',
-                    density=True,
-                    alpha=0.3,
-                )
-                plt.ylabel('')
-                plt.title(traces.columns[i])
+            data = traces[:, i][1:].astype(np.float64)
+            plt.subplot(plot_rows, 2, 2*i + 1)
+            plt.plot(data)
+            plt.title(self._names[i])
+            plt.subplot(plot_rows, 2, 2*i + 2)
+            
+            s_data = sorted(data)
+            plt.plot(s_data, gaussian_kde(data).pdf(s_data), linewidth=2)
+            plt.hist(data, bins=55, density=True, histtype='stepfilled', color='red', alpha=0.3)
+            plt.ylabel('')
         plt.tight_layout()
-        plt.savefig('traces.svg', format='svg', bbox_inches='tight')
+        if save:
+            plt.savefig('traces.svg', format='svg', bbox_inches='tight')
         plt.show() if show else plt.clf()
 
-    def corr_plots(self, traces=None, num_lags=50, show=True):
-        # use the instance's traces attribute if no traces are given as input
-        if traces is None:
-            traces = self.fullchain
 
+    def corr_plots(self, num_lags=50, show=True, save=False):
+
+        traces = self.fullchain
         plot_rows = traces.shape[1]
         plt.figure(figsize=(6, 8))
         for i in range(plot_rows):
-            data = Series(traces[traces.columns[i]])
-            lagdata = [data.autocorr(lag=i) for i in range(0, num_lags + 1)]
+            data = traces[:, i][1:].astype(np.float64)
+            lagdata = [acf(data, lag=i) for i in range(0, num_lags + 1)]
             sub = plt.subplot(
                 plot_rows, 
                 1, i + 1, 
                 xlim=(-1, num_lags + 1), 
-                ylim=(
-                    min(lagdata) - 0.2 if min(lagdata) < 0 else -0.2 , 
-                    1.2
-                )
+                ylim=(min(lagdata) - 0.2 if min(lagdata) < 0 else -0.2 , 1.2)
             )
             plt.plot(lagdata, 'C0o', markersize=5)
             ymaxs = [y - 0.05 if y > 0 else y + 0.05 for y in lagdata]
             plt.vlines(np.arange(num_lags + 1), ymin=0, ymax=ymaxs, color='k')
             plt.hlines(y=0, xmin=-1, xmax=num_lags + 1, color='C0')
-            plt.title("acf of {}".format(traces.columns[i]))
+            plt.title("acf of {}".format(self._names[i]))
         plt.tight_layout()
-        plt.savefig('corr.svg', format='svg', bbox_inches='tight')
+        if save:
+            plt.savefig('corr.svg', format='svg', bbox_inches='tight')
         plt.show() if show else plt.clf()
+
 
     def gelman(self, chain):
         """ Function doc """
@@ -193,13 +183,14 @@ class Sampler(object):
             
             return np.sqrt(V / W)        
 
+
     def geweke(self, chain, first=0.1, last=0.5):
         """ Function doc """
         if self.n_chains == 1:
             raise Exception("the number of chains needs to be 2 or more.")
         else:
-            x1 = chain[:int(first * 100)].values
-            x2 = chain[int((1 - last) * 100):].values
+            x1 = chain[:int(first * 100)]
+            x2 = chain[int((1 - last) * 100):]
             n1 = x1.shape[0]
             n2 = x2.shape[0]
             x1mean = x1.mean(axis=0)
@@ -216,25 +207,26 @@ class Sampler(object):
             return (x1mean - x2mean) / np.sqrt(s1 / n1 + s2 / n2)
 
     
-    def summary(self, export=False):
+    @property
+    def summary(self):
         
-        means = Series(self.fullchain.mean(), name='mean')
-        stds = Series(self.fullchain.std(), name='std')
-        lower = Series(self.fullchain.quantile(0.025), name='2.5%')
-        upper = Series(self.fullchain.quantile(0.975), name='97.5%')
+        table = BeautifulTable()
+        table.column_headers = [
+            'param', 'est. mean', 'std error', 'cred. 2.5%', 'cred. 97.5%', 'PSRF', 'geweke stat'
+        ]
+        table.set_style(BeautifulTable.STYLE_NONE)
         
-        rhat = self.gelman(self.fullchain)
-        rhat = Series(rhat, index=self.fullchain.columns, name='R_hat')
-        gewe = self.geweke(self.fullchain)
-        gewe = Series(gewe, index=self.fullchain.columns, name='Geweke_score')
+        fullchain = self.fullchain[1:].astype(np.float64)
+        rhat = self.gelman(fullchain)
+        gewe = self.geweke(fullchain)
+        means = fullchain.mean(axis=0)
+        stds = fullchain.std(axis=0, ddof=1)
+        lower = np.quantile(fullchain, axis=0, q=0.025)
+        upper = np.quantile(fullchain, axis=0, q=0.975)
         
-        out = concat(
-            [means, stds, lower, upper, rhat, gewe], 
-            axis=1, 
-            join='outer'
-        )
-        
-        if export:
-            with open('mytable.tex', 'w') as table:
-                table.write(out.to_latex())
-        return out
+        for i, param in enumerate(self._names):
+            table.append_row(
+                [param] + [means[i], stds[i], lower[i], upper[i], rhat[i], gewe[i]]
+            )
+            
+        return table

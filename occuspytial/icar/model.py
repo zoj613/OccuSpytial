@@ -32,7 +32,6 @@ from datetime import timedelta
 import time
 
 import numpy as np
-from pandas import DataFrame
 from scipy.linalg import eigh, inv, solve_triangular as tri_solve
 from scipy.sparse import csc_matrix
 from scipy.sparse.linalg import splu
@@ -52,6 +51,7 @@ class ICAR(MCMCModelBase):
 
         super().__init__(X, W, y, init, hypers)
         rank = np.linalg.matrix_rank(Q)
+        self.Q = csc_matrix(Q)
         assert rank < self._n, "Q must be singular"
         self._k = self._z - 0.5  # initial value of k = z - 0.5*1
         self._Wc = None
@@ -65,7 +65,6 @@ class ICAR(MCMCModelBase):
         self._use_rsr = use_rsr
         if not use_rsr:
             # ICAR model specific attributes
-            self.Q = csc_matrix(Q)
             self._eta = self.init["eta"]
         else:
             # RSR model specific attributes
@@ -73,10 +72,9 @@ class ICAR(MCMCModelBase):
             P = -self.X.dot(XTX_inv).dot(self.X.T)
             P[np.diag_indices(self._n)] += 1
             # above 2 lines equivalent to: I - X @ XTX @ XT
-            A = csc_matrix(Q)
+            A = self.Q
             A.data = -A.data
             A.setdiag(np.zeros(self._n))
-            #A = -self.Q + np.diag(np.diag(self.Q))
             Omega = self._n * P.dot(A.dot(P)) / A.sum()
             # return eigen vectors of Omega and keep first q columns
             # corresponding to the q largest eigenvalues of Omega greater
@@ -87,7 +85,7 @@ class ICAR(MCMCModelBase):
             assert q > 0, "Threshold is set too high. Please lower it."
             print("dimension reduced from {0}->{1}".format(Q.shape[0], q))
             self._K = v[:,:q]  # keep first q eigenvectors of ordered eigens
-            self.Minv = self._K.T.dot(csc_matrix(Q).dot(self._K))
+            self.Minv = self._K.T.dot(self.Q.dot(self._K))
             self._Ks = self._K[:self._s] # K sub-matrix for surveyed sites
             self.Q = self.Minv # replace Q with Minv in the underlying ICAR
             self._shape = q #set new shape parameter using the _shape method
@@ -276,8 +274,8 @@ class ICAR(MCMCModelBase):
         finally:
             try:
                 track_progress(i, self._starttime, self._num_iter)
-            except AttributeError: # self._startime is created only if progressbar=True 
-                pass # if exception is thrown then it means progressbar is off thus do nothing and continue
+            except AttributeError:  # self._startime is created only if progressbar=True 
+                pass  # if progressbar is off then do nothing and continue
 
     def _new_init(self, init):
         
@@ -297,7 +295,7 @@ class ICAR(MCMCModelBase):
             self._new_init(init)
             
         if burnin is None:
-            burnin = int(0.5 * iters) # default burnin value
+            burnin = int(0.5 * iters)  # default burnin value
 
         if progressbar: 
             setattr(self, '_starttime', time.monotonic())
@@ -312,5 +310,4 @@ class ICAR(MCMCModelBase):
                 out[j] = np.append(np.append(self._alpha, self._beta), self._tau)
                 j += 1
 
-        self._traces = DataFrame(out)
-        self._traces.columns = self._names
+        self._traces = out

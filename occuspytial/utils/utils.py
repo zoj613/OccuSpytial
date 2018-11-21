@@ -30,6 +30,7 @@
 # OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #
+from __future__ import print_function
 from datetime import timedelta
 import sys, time
 
@@ -43,9 +44,9 @@ except ImportError:
     pass
 
 try:
-    sys.stdout = open(sys.stdout.fileno(), mode='w', encoding='utf8', buffering=1)
+    FILE = open(sys.stdout.fileno(), mode='w', encoding='utf8', buffering=1)
 except:
-    sys.stdout = open('temp.txt', mode='w', encoding='utf8', buffering=1)
+    FILE = open('temp.txt', mode='w', encoding='utf8', buffering=1)
 
 
 __all__ = [
@@ -70,9 +71,7 @@ def _progressbar(current, total, elapsed, remain, _fill="█"):
         round(current / elapsed.total_seconds(), 2)
     ]
     text = '\r{1:.1f}%[{0}] {3}/{4} [{2}<{5}, {6}draws/s] '.format(*_input)
-    #print(text, end="", file=FILE, flush=True)
-    sys.stdout.write(text)
-    sys.stdout.flush()
+    print(text, end="", file=FILE, flush=True)
     if progress == 1:
         print("\r\n")
 
@@ -107,6 +106,16 @@ def affine_sample(mean, cov, return_factor=False):
            return x
 
 
+def acf(x, lag=0):
+    """ Function doc """
+    if lag == 0:
+        return 1
+    elif lag < len(x) - 1:    
+        return np.corrcoef(x[:-lag], x[lag:])[0, 1]
+    else:
+        raise Exception("lag must be less than {}".format(len(x) - 1))
+
+
 class CustomDict(dict):    
     # a mix-in class for group-indexing W and y dictionaries
     def slice(self, *keys):
@@ -115,8 +124,8 @@ class CustomDict(dict):
         except TypeError: #if input is not hashable
             out = [self[k] for k in keys[0]]
         return np.concatenate(tuple(out))
-        
 
+        
 class SpatialStructure(object):
     """ A class intended for generating spatial precision matrix used in 
     models like CAR, ICAR and RSR"""
@@ -124,10 +133,10 @@ class SpatialStructure(object):
     def __init__ (self, n):
         """ Class initialiser """
         self.n = n
-        self.lat = None
+        self.lattice = None
         self.A = None
         
-    def _create_rand_lattice(self, n=None):
+    def _generate_random_lattice(self, n=None):
         """ Function doc """
         if n is not None:
             a = n
@@ -144,8 +153,7 @@ class SpatialStructure(object):
         d = d[-(a // 2):]  # remove duplicate pairs
         factors = d[np.random.randint(0,len(d))]  # randomly select one element
         # create a lattice rectangular grid of dimensions factors[0] x factors[1]
-        lattice = np.arange(1, a + 1).reshape(factors)
-        self.lat = lattice
+        self.lattice = np.arange(1, a + 1).reshape(factors)
     
     def _neighbor_indx(self, indx, n_type=4):
         """ Function doc """
@@ -165,28 +173,34 @@ class SpatialStructure(object):
 
         return out
     
-    def _adjacency_matrix(self):
+    def _adjacency_matrix(self, n_type=4):
         """ use the generated lattice to create an adjacency matrix A, where
         an element A[i, j] = 1 if i and j are neighbors and A[i, j] = 0 
         otherwise for i =/= j. A[i, i] = 0 for all i."""
         A = np.zeros((self.n, self.n))
-        for indx, site in np.ndenumerate(self.lat):
+        for indx, site in np.ndenumerate(self.lattice):
             A[site - 1, site - 1] = 0 
             # randomly decide the maximum number of neighbors for site.
-            type_of_neighbor = np.random.choice([4, 8], p=[0.5, 0.5])
-            neighbor_indx = self._neighbor_indx(indx, type_of_neighbor)
+            if n_type == 'mixed':
+                
+                type_of_neighbor = np.random.choice([4, 8], p=[0.5, 0.5])
+                neighbor_indx = self._neighbor_indx(indx, type_of_neighbor)
+            else:
+                
+                neighbor_indx = self._neighbor_indx(indx, n_type)
+
             for row, col in neighbor_indx:
                 try:
-                    neighbor_site = self.lat[row, col]
+                    neighbor_site = self.lattice[row, col]
                     A[site - 1, neighbor_site - 1] = 1
                     A[neighbor_site - 1, site - 1] = 1
                 except IndexError:
                     continue
         self.A = A
             
-    def spatial_precision(self, rho=1):
+    def spatial_precision(self, n_type='mixed', rho=1):
         """ Function doc """
-        self._create_rand_lattice()
-        self._adjacency_matrix()
+        self._generate_random_lattice()
+        self._adjacency_matrix(n_type)
         D = np.diag(self.A.sum(axis=0))
         return D - rho * self.A

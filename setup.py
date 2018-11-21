@@ -12,7 +12,7 @@ with open("README.rst", "r") as fh:
     long_description = fh.read()
 
 setup(
-    name='OccuSpytial',
+    name='occuspytial',
     version='0.1',
     author='Zolisa Bleki',
     author_email='zolisa.bleki@gmail.com',
@@ -22,8 +22,11 @@ setup(
     license='BSD',
     url="https://github.com/zoj613/OccuSpytial",
     install_requires = [
-        'loky', 'pandas','pypolyagamma',  # 'scikit-sparse' (optional)
+        'loky', 'beautifultable','pypolyagamma',
     ],
+    extras_require = {
+        'fast sparse matrix cholesky factorization':  ['scikit-sparse']
+    },
     packages=find_packages(),
     include_package_data=True,
     classifiers=[
