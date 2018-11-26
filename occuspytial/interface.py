@@ -180,16 +180,16 @@ class Sampler(object):
             # the pooled variance
             V = (N - 1) * W / N + (M + 1) * B / (M * N)
             
-            return np.sqrt(V / W)        
-
-
+            return np.sqrt(V / W)
+        
+        
     def geweke(self, chain, first=0.1, last=0.5):
         """ Function doc """
         if self.n_chains == 1:
             raise Exception("the number of chains needs to be 2 or more.")
         else:
-            x1 = chain[:int(first * 100)]
-            x2 = chain[int((1 - last) * 100):]
+            x1 = chain[:int(first * chain.shape[0])]
+            x2 = chain[int((1 - last) * chain.shape[0]):]
             n1 = x1.shape[0]
             n2 = x2.shape[0]
             x1mean = x1.mean(axis=0)
