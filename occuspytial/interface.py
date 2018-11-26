@@ -94,18 +94,17 @@ class Sampler(object):
         
             
     def run(self, iters=1000, burnin=None, new_init=None, progressbar=True):
-
+        
         executor = get_reusable_executor(max_workers=cpu_count())
 
-        if new_init is not None:
-            self._new_inits(new_init)
+        if new_init is not None: self._new_inits(new_init)
 
-        args = [(self.model, iters, burnin, init, progressbar) for init in self.inits]
+        args = [
+            (self.model, iters, burnin, init, progressbar) for init in self.inits
+        ]
         results = executor.map(self._get_samples, args)
-        for i in range(self.n_chains):
-            out = next(results)
-            setattr(Sampler, 'chain{}'.format(i), out)
-            self.fullchain = np.concatenate((self.fullchain, out))
+        for chain in list(results):
+            self.fullchain = np.concatenate((self.fullchain, chain))
 
 
     def trace_plots(self, show=True, save=False):
@@ -223,6 +222,8 @@ class Sampler(object):
         upper = np.quantile(fullchain, axis=0, q=0.975)
         
         for i, param in enumerate(self._names):
+            param = param.replace('$', '')
+            param = param.replace('\\', '')
             table.append_row(
                 [param] + [means[i], stds[i], lower[i], upper[i], rhat[i], gewe[i]]
             )

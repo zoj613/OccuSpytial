@@ -39,7 +39,7 @@ from scipy.special import expit  # inverse logit
 from pypolyagamma import PyPolyaGamma
 
 from .helpers.ctypesfunc import _num_prod
-from ..utils.utils import affine_sample, CustomDict, track_progress
+from ..utils.utils import affine_sample, CustomDict, ProgressBar
 from ..utils.basemodel import MCMCModelBase
 
 pg = PyPolyaGamma()
@@ -271,11 +271,7 @@ class ICAR(MCMCModelBase):
             self._update_func(self._theta_update, self._K, self._theta)
         except AttributeError:
             self._update_func(self._eta_update, self._eta)
-        finally:
-            try:
-                track_progress(i, self._starttime, self._num_iter)
-            except AttributeError:  # self._startime is created only if progressbar=True 
-                pass  # if progressbar is off then do nothing and continue
+
 
     def _new_init(self, init):
         
@@ -291,23 +287,19 @@ class ICAR(MCMCModelBase):
 
     def run_sampler(self, iters=2000, burnin=None, init=None, progressbar=True):
         
-        if init is not None:
-            self._new_init(init)
+        if init is not None: self._new_init(init)
             
-        if burnin is None:
-            burnin = int(0.5 * iters)  # default burnin value
+        if burnin is None: burnin = int(0.5 * iters)  # default burnin value
 
-        if progressbar: 
-            setattr(self, '_starttime', time.monotonic())
-            setattr(self, '_num_iter', iters)
+        if progressbar: bar = ProgressBar(iters)
             
         j = 0
         out = np.zeros((iters - burnin, len(self._names)))
         for i in range(iters):
             self._params_update(i)
-            
+            if progressbar: bar.update()
             if i >= burnin:
                 out[j] = np.append(np.append(self._alpha, self._beta), self._tau)
                 j += 1
-
+        
         self._traces = out

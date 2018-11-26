@@ -43,46 +43,71 @@ try:
 except ImportError:
     pass
 
-try:
-    FILE = open(sys.stdout.fileno(), mode='w', encoding='utf8', buffering=1)
-except:
-    FILE = open('temp.txt', mode='w', encoding='utf8', buffering=1)
 
-
-__all__ = [
-    "track_progress",
-    "affine_sample",
-    "CustomDict"
-]
-
-
-def _progressbar(current, total, elapsed, remain, _fill="█"): 
+class ProgressBar(object):
+    """ Class doc """
+    BAR_LENGTH = 25
     
-    progress = current / total
-    BAR_LENGTH = 25 # Modify this to change the length of the progress bar
-    block = int(round(BAR_LENGTH * progress))
-    _input = [
-        _fill * block + "-" * (BAR_LENGTH - block), #'█'
-        progress * 100,
-        str(elapsed).split(".")[0],
-        current,
-        total,
-        str(remain).split(".")[0],
-        round(current / elapsed.total_seconds(), 2)
-    ]
-    text = '\r{1:.1f}%[{0}] {3}/{4} [{2}<{5}, {6}draws/s] '.format(*_input)
-    print(text, end="", file=FILE, flush=True)
-    if progress == 1:
-        print("\r\n")
+    def __init__ (self, n):
+        """ Class initialiser """
+        if sys.stdout.isatty():  # check if script is running from console
+            self._FILE = open(sys.stdout.fileno(), mode='w', encoding='utf8')
+            fill = "█"
+        else:
+            fill = "#"
+        
+        self.start = self._now
+        self.n = n
+        self.i = 0
+        self.fill = fill
+        self.progress = 0
 
+        
+    def _bar_string(self):
 
-def track_progress(i, start, iters):
+        elapsed, remaining = self._elapsed_and_remaining_time()
+        self.progress = self.i / self.n
+        block = int(round(ProgressBar.BAR_LENGTH * self.progress))
+        bar = [
+            self.fill * block + ' ' * (ProgressBar.BAR_LENGTH - block), 
+            self.progress * 100,
+            str(elapsed).split('.')[0],
+            self.i,
+            self.n,
+            str(remaining).split(".")[0],
+            round(self.i / elapsed.total_seconds(), 2)
+        ]
+        return '{1:.1f}%[{0}] {3}/{4} [{2}<{5}, {6}draws/s]'.format(*bar)
+
     
-    now = time.monotonic()
-    elapsed = timedelta(seconds=now - start)
-    est_total = timedelta(seconds=iters/(i + 1) * (now - start))
-    remain = est_total - elapsed
-    _progressbar(i + 1, iters, elapsed, remain)
+    @property
+    def _now(self):
+
+        return time.monotonic()
+
+
+    def _elapsed_and_remaining_time(self):
+        
+        now = self._now
+        elapsed_time = timedelta(seconds=now - self.start)
+        est_total_time = timedelta(
+            seconds=self.n / self.i * (now - self.start)
+        )
+        return elapsed_time, est_total_time - elapsed_time
+
+
+    def update(self):
+        
+        self.i += 1
+        if sys.stdout.isatty():
+            print(self._bar_string(), file=self._FILE, end='\r')
+        else:
+            print(self._bar_string(), end='\r')
+        
+        if self.progress == 1:
+            print()
+            #if hasattr(self, '_FILE'): 
+                #self._FILE.close()
 
 
 def affine_sample(mean, cov, return_factor=False):
