@@ -11,12 +11,14 @@ ext = [
 with open("README.rst", "r") as fh:
     long_description = fh.read()
 
+descr = 'A package for bayesian analysis of spatial occupancy models'
+
 setup(
     name='occuspytial',
     version='0.1',
     author='Zolisa Bleki',
     author_email='zolisa.bleki@gmail.com',
-    description='A package for bayesian analysis of spatial occupancy models',
+    description=descr,
     long_description=long_description,
     long_description_content_type="text/markdown",
     license='BSD',

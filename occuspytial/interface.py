@@ -61,11 +61,13 @@ class Sampler(object):
         if model.lower() == 'icar':
             self.model = ICAR(X, W, y, Q, INIT, HYPERS)
         elif model.lower() == 'rsr':
-            self.model = ICAR(X, W, y, Q, INIT, HYPERS, use_rsr=True, threshold=threshold)
+            self.model = ICAR(X, W, y, Q, INIT, HYPERS,
+                              use_rsr=True, threshold=threshold)
         else:
             raise Exception("model choice can only be 'icar' or 'rsr'")
         self._names = self.model._names
         self.fullchain = np.array(self._names, ndmin=2)
+        self.occ_probs = np.zeros(self.model._n)
 
 
     def _new_inits(self, init):
@@ -77,40 +79,53 @@ class Sampler(object):
             _init = {}
             for key, value in init.items():
                 if key == "alpha" or key == "beta":
-                    newvalue = value + np.random.uniform(-2, 2, len(value))
+                    value += np.random.uniform(-2, 2, len(value))
                 elif key == "tau":
-                    newvalue = value + np.random.uniform(0, 5)
+                    value += np.random.uniform(0, 5)
                 else:
-                    newvalue = value + np.random.uniform(-2, 2, len(value))
+                    value += np.random.uniform(-2, 2, len(value))
     
-                _init[key] = newvalue
+                _init[key] = value
             self.inits.append(_init)
+
  
     def _get_samples(self, args):
         """ Function doc """
-        model, iters, burnin, init, progressbar = args
-        model.run_sampler(iters, burnin, init, progressbar=progressbar)
-        return model._traces
+        model, iters, burnin, init, progressbar, nonspat = args
+        model.run_sampler(iters, burnin, init, progressbar, nonspat)
+        if model._use_rsr:
+            return model._traces, model.z_mat.mean(axis=0)
+        else:
+            return model._traces, model.z_mat.mean(axis=0)
         
             
-    def run(self, iters=1000, burnin=None, new_init=None, progressbar=True):
+    def run(self, iters=1000, burnin=None, new_init=None,
+            progressbar=True, nonspatial=False):
         
         executor = get_reusable_executor(max_workers=cpu_count())
 
         if new_init is not None: self._new_inits(new_init)
+        setattr(self, 'nonspat', nonspatial)
 
         args = [
-            (self.model, iters, burnin, init, progressbar) for init in self.inits
+            (self.model, iters, burnin, init, progressbar, nonspatial) \
+            for init in self.inits
         ]
         results = executor.map(self._get_samples, args)
-        for chain in list(results):
+        for chain, avg_occ in list(results):
             self.fullchain = np.concatenate((self.fullchain, chain))
+            self.occ_probs += avg_occ
+
+        self.occ_probs /= self.n_chains
 
 
-    def trace_plots(self, show=True, save=False):
+    def trace_plots(self, show=True, save=False, name='traces'):
 
         traces = self.fullchain
-        plot_rows = traces.shape[1]
+        if self.nonspat:
+            plot_rows = traces.shape[1] - 1
+        else:
+            plot_rows = traces.shape[1]
         plt.figure(figsize=(6, 8))
         for i in range(plot_rows):
             data = traces[:, i][1:].astype(np.float64)
@@ -121,18 +136,22 @@ class Sampler(object):
             
             s_data = sorted(data)
             plt.plot(s_data, gaussian_kde(data).pdf(s_data), linewidth=2)
-            plt.hist(data, bins=55, density=True, histtype='stepfilled', color='red', alpha=0.3)
+            plt.hist(data, bins=55, density=True, histtype='stepfilled',\
+                     color='red', alpha=0.3)
             plt.ylabel('')
         plt.tight_layout()
         if save:
-            plt.savefig('traces.svg', format='svg', bbox_inches='tight')
+            plt.savefig('{}.svg'.format(name), format='svg', bbox_inches='tight')
         plt.show() if show else plt.clf()
 
 
-    def corr_plots(self, num_lags=50, show=True, save=False):
+    def corr_plots(self, num_lags=50, show=True, save=False, name='corr'):
 
         traces = self.fullchain
-        plot_rows = traces.shape[1]
+        if self.nonspat:
+            plot_rows = traces.shape[1] - 1
+        else:
+            plot_rows = traces.shape[1]
         plt.figure(figsize=(6, 8))
         for i in range(plot_rows):
             data = traces[:, i][1:].astype(np.float64)
@@ -150,25 +169,27 @@ class Sampler(object):
             plt.title("acf of {}".format(self._names[i]))
         plt.tight_layout()
         if save:
-            plt.savefig('corr.svg', format='svg', bbox_inches='tight')
+            plt.savefig('{}.svg'.format(name), format='svg', bbox_inches='tight')
         plt.show() if show else plt.clf()
 
 
-    def gelman(self, chain):
+    def gelman(self, chains):
         """ Function doc """
         if self.n_chains == 1:
-            raise Exception("the number of chains needs to be 2 or more.")
+            #raise Exception("the number of chains needs to be 2 or more.")
+            return None
         else:
             # split up the big chain into multiple chains
             try:
-                s = np.split(chain, self.n_chains, axis=0)
+                s = np.split(chains, self.n_chains, axis=0)
             except ValueError:
-                raise Exception("chains need to be of equal length. \
-                                Lower or increase the number of chains.") 
+                raise Exception("Chains need to be of equal length. \
+                                Lower of increase the number of chains.") 
             M = self.n_chains  # number of chains
             N = s[0].shape[0] # length of each chain (assume all are of equal length)
             # squared differences of each chain
-            sqd = [(s[i].mean(axis=0) - chain.mean(axis=0))**2 for i in range(M)]
+            sqd = [(s[i].mean(axis=0) - chains.mean(axis=0))**2 \
+                    for i in range(M)]
             # calculate the between chains variances for each parameter
             B = np.stack(sqd).sum(axis=0) * s[0].shape[0] / (len(s) - 1)
             
@@ -180,52 +201,64 @@ class Sampler(object):
             # the pooled variance
             V = (N - 1) * W / N + (M + 1) * B / (M * N)
             
-            return np.sqrt(V / W)
-        
-        
+            return np.sqrt(V / W)      
+
+
     def geweke(self, chain, first=0.1, last=0.5):
         """ Function doc """
-        if self.n_chains == 1:
-            raise Exception("the number of chains needs to be 2 or more.")
-        else:
-            x1 = chain[:int(first * chain.shape[0])]
-            x2 = chain[int((1 - last) * chain.shape[0]):]
-            n1 = x1.shape[0]
-            n2 = x2.shape[0]
-            x1mean = x1.mean(axis=0)
-            x2mean = x2.mean(axis=0)
+        x1 = chain[:int(first * chain.shape[0])]
+        x2 = chain[int((1 - last) * chain.shape[0]):]
+        n1 = x1.shape[0]
+        n2 = x2.shape[0]
+        x1mean = x1.mean(axis=0)
+        x2mean = x2.mean(axis=0)
+        
+        num_of_params = chain.shape[1]
+        s1 = np.empty(num_of_params)
+        s2 = s1
+        
+        for i in range(num_of_params):
+            s1[i] = specdensity(x1[:, i], nperseg=n1, scaling='density')[1][0]
+            s2[i] = specdensity(x2[:, i], nperseg=n2, scaling='density')[1][0]
             
-            num_of_params = chain.shape[1]
-            s1 = np.empty(num_of_params)
-            s2 = s1
-            
-            for i in range(num_of_params):
-                s1[i] = specdensity(x1[:, i])[1][0]
-                s2[i] = specdensity(x2[:, i])[1][0]
-                
-            return (x1mean - x2mean) / np.sqrt(s1 / n1 + s2 / n2)
+        return (x1mean - x2mean) / np.sqrt(s1 / n1 + s2 / n2)
 
     
     @property
     def summary(self):
         
         table = BeautifulTable(default_alignment=BeautifulTable.ALIGN_RIGHT)
-        table.column_headers = ['param', 'mean', 'std', '2.5%', '97.5%', 'PSRF', 'geweke']
         table.set_style(BeautifulTable.STYLE_NONE)
-
         fullchain = self.fullchain[1:].astype(np.float64)
-        rhat = self.gelman(fullchain)
         gewe = self.geweke(fullchain)
         means = fullchain.mean(axis=0)
         stds = fullchain.std(axis=0, ddof=1)
-        lower = np.quantile(fullchain, axis=0, q=0.025)
-        upper = np.quantile(fullchain, axis=0, q=0.975)
+        lower = means - 1.96 * stds
+        upper = means + 1.96 * stds
         
-        for i, param in enumerate(self._names):
+        if self.n_chains == 1:
+            table.column_headers = [
+                'param', 'mean', 'std', '2.5%', '97.5%', 'geweke'
+            ]
+        else:
+            table.column_headers = [
+                'param', 'mean', 'std', '2.5%', '97.5%', 'PSRF', 'geweke'
+            ]
+            rhat = self.gelman(fullchain)
+
+        names = self._names[:-1] if self.nonspat else  self._names
+            
+        for i, param in enumerate(names):
             param = param.replace('$', '')
             param = param.replace('\\', '')
-            table.append_row(
-                [param] + [means[i], stds[i], lower[i], upper[i], rhat[i], gewe[i]]
-            )
-            
+            if self.n_chains == 1:
+                table.append_row(
+                    [param] + [means[i], stds[i], lower[i], upper[i], gewe[i]]
+                )
+            else:
+                table.append_row(
+                    [param] + 
+                    [means[i], stds[i], lower[i], upper[i], rhat[i], gewe[i]]
+                )
+                
         return table

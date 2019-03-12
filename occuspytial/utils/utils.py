@@ -33,6 +33,7 @@
 from __future__ import print_function
 from datetime import timedelta
 import sys, time
+from warnings import simplefilter
 
 import numpy as np
 from numpy.random import standard_normal as std_norm
@@ -113,14 +114,15 @@ class ProgressBar(object):
 def affine_sample(mean, cov, return_factor=False):
     """ Function doc """
     try:
-        factor = sp_chol(cov)
-        x = mean + factor.L().dot(std_norm(len(mean)))
+        factor = sp_chol(cov, mode="supernodal")
+        chol_factor = factor.apply_Pt(factor.L())
+        x = mean + chol_factor.dot(std_norm(len(mean)))
     
     except (NameError, AttributeError):
 
         # sp_chol failed to import and/or cov is dense
         cov_dense = cov.toarray() if issparse(cov) else cov
-        factor = chol(cov_dense, lower=True, check_finite=False)
+        factor = chol(cov_dense, check_finite=False).T
         x = mean + factor.dot(std_norm(len(mean)))   
     
     finally:
@@ -161,22 +163,25 @@ class SpatialStructure(object):
         self.lattice = None
         self.A = None
         
-    def _generate_random_lattice(self, n=None):
+    def _generate_random_lattice(self, n=None, fix_square=False):
         """ Function doc """
         if n is not None:
             a = n
         else:
             a = self.n
-
-        b = np.arange(1, a + 1)
-        c = b[a % b == 0][1:-1]  # multiplicative factors of n except for 1
-        d = []
-        for i in c:
-            out = c[i * c == a][0]  # factor whose product with i equals a
-            d.append((i, out))
-        
-        d = d[-(a // 2):]  # remove duplicate pairs
-        factors = d[np.random.randint(0,len(d))]  # randomly select one element
+        if fix_square:
+            _sqrt = int(np.sqrt(a))
+            factors = (_sqrt, _sqrt)
+        else:
+            b = np.arange(1, a + 1)
+            c = b[a % b == 0][1:-1]  # multiplicative factors of n except for 1
+            d = []
+            for i in c:
+                out = c[i * c == a][0]  # factor whose product with i equals a
+                d.append((i, out))
+            
+            d = d[-(a // 2):]  # remove duplicate pairs
+            factors = d[np.random.randint(0,len(d))]  # randomly select one element
         # create a lattice rectangular grid of dimensions factors[0] x factors[1]
         self.lattice = np.arange(1, a + 1).reshape(factors)
     
@@ -223,9 +228,9 @@ class SpatialStructure(object):
                     continue
         self.A = A
             
-    def spatial_precision(self, n_type='mixed', rho=1):
+    def spatial_precision(self, n_type='mixed', rho=1, square_lattice=False):
         """ Function doc """
-        self._generate_random_lattice()
+        self._generate_random_lattice(fix_square=square_lattice)
         self._adjacency_matrix(n_type)
         D = np.diag(self.A.sum(axis=0))
         return D - rho * self.A

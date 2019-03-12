@@ -31,14 +31,13 @@
 //
 
 #include <stddef.h>
-void _num_product(double *omd, double *occ, long *not_obs, size_t not_obs_size, long *V, double *num);
+void _num_product(double *omd, long *not_obs, size_t not_obs_size, long *V, double *num);
 
-void _num_product(double *omd, double *occ, long *not_obs, size_t not_obs_size, long *V, double *num) 
+void _num_product(double *omd, long *not_obs, size_t not_obs_size, long *V, double *num) 
 {
     size_t i, j, count = 0, omd_indx, v_size, v_indx;
     
     for (i = 0; i < not_obs_size; ++i){
-        num[i] = occ[i];
         v_indx = not_obs[i];
         v_size = V[v_indx];
         for (j = 0; j < v_size; ++j){
@@ -48,4 +47,5 @@ void _num_product(double *omd, double *occ, long *not_obs, size_t not_obs_size, 
         count += v_size;
     };
 }
+
 

@@ -69,9 +69,11 @@ class MCMCModelBase(ABC):
                 self.not_obs.append(i)
                 self._z[i] = 0.0
         self.not_obs = np.array(self.not_obs, dtype=np.int64)
-        self.no_size = self.not_obs.shape[0]
         #array to store probability updates for sites where species is not obversed
-        self._probs = np.ones(self.not_obs.size, dtype=np.float64)
+        self._probs = np.zeros(self.not_obs.size, dtype=np.float64)
+        #array to store occupancy prob for sites where species is not surveyed/unsurveyed
+        self._s_probs = np.zeros(self._s, dtype=np.float64)
+        self._us_probs = np.zeros(self._us, dtype=np.float64)
         # stacked W matrix for all sites where species is not observed
         self._W_ = CustomDict(self.W).slice(self.not_obs)
 
@@ -81,10 +83,12 @@ class MCMCModelBase(ABC):
         for i in range(X.shape[1]):
             self._names.append(r"$\beta_{0}$".format(i))
         # specify the names of the posterior parameters
+        self._names.append("PAO")
         self._names.append(r"$\tau$")
         self._alpha = init["alpha"]
         self._beta = init["beta"]
         self._tau = init["tau"]
+        self.avg_occ_probs = np.ones(self._n)
 
     @abc.abstractmethod
     def _alpha_update(self):

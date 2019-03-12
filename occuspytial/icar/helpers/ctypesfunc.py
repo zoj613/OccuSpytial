@@ -48,9 +48,8 @@ _num_prod = lib._num_product
 _num_prod.restype = None
 _num_prod.argtypes = [
 	ndpointer(ctypes.c_double, flags="C_CONTIGUOUS"),
-	ndpointer(ctypes.c_double, flags="C_CONTIGUOUS"),
 	ndpointer(ctypes.c_long, flags="C_CONTIGUOUS"),
-        ctypes.c_size_t,
+    ctypes.c_size_t,
 	ndpointer(ctypes.c_long, flags="C_CONTIGUOUS"),
 	ndpointer(ctypes.c_double, flags="C_CONTIGUOUS")
 ]
