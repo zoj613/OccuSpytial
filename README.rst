@@ -7,7 +7,10 @@ Installation
 ------------
 currently this package can be installed by downloading the repository and running the following command on the folder with the package:
 ::
-  python setup.py install --user
+   git clone https://github.com/zoj613/OccuSpytial.git
+   cd OccuSpytial
+   python setup.py install
+   
 It is strongly recommended that you have the package :math:`scikit-sparse` installed before using this package in order to fully take advantage of the speed gains possible. Using this package with math:`scikit-sparse` installed can result in sampler speedups of roughly 14 times or more.
 
 Usage
@@ -45,6 +48,7 @@ The initializing `Sampler` class accepts:
     # keep only the last 300 iterations from each of the 3 chains to form a chain with 900 samples per parameter.
     # progressbar=True is set so that the progress bar can be shown while the sampler is running.
     >>> icarmodel.run(iters=100000, burnin=99700, progressbar=True)
+        100.0%[█████████████████████████] 100000/100000 [0:14:27<0:00:00, 115.21draws/s]
     # print the summary table containing the posterior estimates of the parameters, their standard errors and convergence diagnostics info
     >>> print(icarmodel.summary())
                         mean       std      2.5%     97.5%      R_hat  Geweke_score
@@ -59,6 +63,6 @@ The initializing `Sampler` class accepts:
     
 TO DO
 -----
-* Add a folder with dummy data
-* Add a function that simulates the ICAR precision matrix given any total site number.
-* Add more novel spatial occupancy models
+* Add a folder with dummy data and a tutorial notebook.
+* Figure out how to display the progress bar while using this package inside ipython / ipython-notebook / jupyter-console.
+* Add more spatial occupancy models
