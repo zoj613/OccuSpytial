@@ -93,10 +93,7 @@ class Sampler(object):
         """ Function doc """
         model, iters, burnin, init, progressbar, nonspat = args
         model.run_sampler(iters, burnin, init, progressbar, nonspat)
-        if model._use_rsr:
-            return model._traces, model.z_mat.mean(axis=0)
-        else:
-            return model._traces, model.z_mat.mean(axis=0)
+        return model._traces, model.z_mat.mean(axis=0)
         
             
     def run(self, iters=1000, burnin=None, new_init=None,
