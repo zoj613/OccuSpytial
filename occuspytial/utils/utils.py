@@ -201,6 +201,9 @@ class SpatialStructure(object):
         out.append((indx[0] - 1, indx[1]))
         out.append((indx[0] + 1, indx[1]))
 
+        for item in np.array(out):
+            if not np.all(item >= 0):
+                out.remove(tuple(item))
         return out
     
     def _adjacency_matrix(self, n_type=4):
