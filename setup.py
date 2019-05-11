@@ -17,22 +17,20 @@ setup(
     name='occuspytial',
     version='0.1',
     author='Zolisa Bleki',
-    author_email='zolisa.bleki@gmail.com',
     description=descr,
     long_description=long_description,
     long_description_content_type="text/markdown",
     license='BSD',
     url="https://github.com/zoj613/OccuSpytial",
-    install_requires = [
-        'loky', 'beautifultable','pypolyagamma',
+    install_requires=[
+        'loky', 'beautifultable', 'pypolyagamma',
     ],
-    extras_require = {
-        'fast sparse matrix cholesky factorization':  ['scikit-sparse']
+    extras_require={
+        'fast sparse matrix cholesky factorization': ['scikit-sparse']
     },
     packages=find_packages(),
     include_package_data=True,
     classifiers=[
-        'Programming Language :: Python :: 2.7'
         'Programming Language :: Python :: 3.5'
         'Programming Language :: Python :: 3.6',
         'Development Status :: 3 - Alpha',
@@ -40,7 +38,7 @@ setup(
         'Intended Audience :: Science/Research',
         'Operating System :: Unix',
         'License :: OSI Approved :: BSD License',
-        'Topic :: Scientific/Engineering'        
+        'Topic :: Scientific/Engineering'
     ],
     cmdclass={'build_ext': build_ext},
     ext_modules=ext

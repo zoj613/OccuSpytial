@@ -1,67 +1,35 @@
-#!/usr/bin/env python
-# -*- coding: utf-8 -*-
-# BSD 3-Clause License
-#
-# Copyright (c) 2018, Zolisa Bleki
-# All rights reserved.
-#
-# Redistribution and use in source and binary forms, with or without
-# modification, are permitted provided that the following conditions are met:
-#
-# * Redistributions of source code must retain the above copyright notice, this
-#   list of conditions and the following disclaimer.
-#
-# * Redistributions in binary form must reproduce the above copyright notice,
-#   this list of conditions and the following disclaimer in the documentation
-#   and/or other materials provided with the distribution.
-#
-# * Neither the name of the copyright holder nor the names of its
-#   contributors may be used to endorse or promote products derived from
-#   this software without specific prior written permission.
-#
-# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
-# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-# DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
-# FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
-# DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
-# SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
-# CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-# OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-# 
-import sys
-import abc
+from abc import ABC, abstractmethod
+from typing import Dict, NoReturn, Tuple
 
-import numpy as np
+import numpy as np  # type: ignore
 
 from .utils import CustomDict
 
-# done so the base class is compatible with both python 2 and 3.
-# https://stackoverflow.com/questions/35673474/using-abc-abcmeta-in-a-way-it-is-compatible-both-with-python-2-7-and-python-3-5
-if sys.version_info >= (3, 4):
-    ABC = abc.ABC
-else:
-    ABC = abc.ABCMeta(b'ABC', (), {})
 
 class MCMCModelBase(ABC):
 
-    def __init__(self, X, W, y, init, hypers):
+    def __init__(self,
+                 X: np.ndarray,
+                 W: Dict[int, np.ndarray],
+                 y: Dict[int, np.ndarray],
+                 init: Dict[str, Tuple[np.ndarray, float]],
+                 hypers: Dict[str, Tuple[np.ndarray, float]]
+                 ) -> NoReturn:
 
         self.W = W
         self.X = X
         self.y = y
         self._n = X.shape[0]  # number of sites in total
-        self._s = len(self.y) # number of surveyed sites
+        self._s = len(self.y)  # number of surveyed sites
         self._us = self._n - self._s  # number of unsurveyed sites
-        self.Xs = X[:self._s] # X sub-matrix for surveyed sites.
+        self.Xs = X[:self._s]  # X sub-matrix for surveyed sites.
         self._V = np.array(
             [self.W[i].shape[0] for i in range(self._s)],
             dtype=np.int64
         )
         self.init = init
         self.hypers = hypers
-        self.not_obs = [] #surveyed sites where species is not observed
+        self.not_obs = []  # surveyed sites where species is not observed
         # initialize z, the site occupancy state
         self._z = np.ones(self._n, dtype=np.int64)
         for i in range(self._s):
@@ -69,9 +37,9 @@ class MCMCModelBase(ABC):
                 self.not_obs.append(i)
                 self._z[i] = 0.0
         self.not_obs = np.array(self.not_obs, dtype=np.int64)
-        #array to store probability updates for sites where species is not obversed
+        # array to store prob updates for sites where species is not obversed
         self._probs = np.zeros(self.not_obs.size, dtype=np.float64)
-        #array to store occupancy prob for sites where species is not surveyed/unsurveyed
+        # array to store occupancy prob for sites where species is unsurveyed
         self._s_probs = np.zeros(self._s, dtype=np.float64)
         self._us_probs = np.zeros(self._us, dtype=np.float64)
         # stacked W matrix for all sites where species is not observed
@@ -90,18 +58,18 @@ class MCMCModelBase(ABC):
         self._tau = init["tau"]
         self.avg_occ_probs = np.ones(self._n)
 
-    @abc.abstractmethod
+    @abstractmethod
     def _alpha_update(self):
         pass
 
-    @abc.abstractmethod
+    @abstractmethod
     def _beta_update(self):
         pass
 
-    @abc.abstractmethod
+    @abstractmethod
     def _z_update(self):
         pass
 
-    @abc.abstractmethod
-    def run_sampler(self, iters=2000):
+    @abstractmethod
+    def run_sampler(self, iters: int = 2000):
         pass

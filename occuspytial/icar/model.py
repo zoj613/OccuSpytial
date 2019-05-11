@@ -1,44 +1,14 @@
-# BSD 3-Clause License
-#
-# Copyright (c) 2018, Zolisa Bleki
-# All rights reserved.
-#
-# Redistribution and use in source and binary forms, with or without
-# modification, are permitted provided that the following conditions are met:
-#
-# * Redistributions of source code must retain the above copyright notice, this
-#   list of conditions and the following disclaimer.
-#
-# * Redistributions in binary form must reproduce the above copyright notice,
-#   this list of conditions and the following disclaimer in the documentation
-#   and/or other materials provided with the distribution.
-#
-# * Neither the name of the copyright holder nor the names of its
-#   contributors may be used to endorse or promote products derived from
-#   this software without specific prior written permission.
-#
-# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
-# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-# DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
-# FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
-# DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
-# SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
-# CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-# OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-#
-from datetime import timedelta
-import time
+from typing import Callable, Dict, NoReturn, Optional, Tuple
 
-import numpy as np
+import numpy as np  # type: ignore
+from numpy.linalg import multi_dot
 from scipy.linalg import eigh, inv, solve_triangular as tri_solve
 from scipy.sparse import csc_matrix
 from scipy.sparse.linalg import splu
 from scipy.special import expit  # inverse logit
 from pypolyagamma import PyPolyaGamma
 
-from .helpers.ctypesfunc import _num_prod
+from .helpers.ctypesfunc import num_prod
 from ..utils.utils import affine_sample, CustomDict, ProgressBar
 from ..utils.basemodel import MCMCModelBase
 
@@ -47,8 +17,16 @@ pg = PyPolyaGamma()
 
 class ICAR(MCMCModelBase):
 
-    def __init__(self, X, W, y, Q, init, hypers, use_rsr=False,
-                 threshold=0.5):
+    def __init__(self,
+                 X: np.ndarray,
+                 W: Dict[int, np.ndarray],
+                 y: Dict[int, np.ndarray],
+                 Q: np.ndarray,
+                 init: Dict[str, Tuple[np.ndarray, float]],
+                 hypers: Dict[str, Tuple[np.ndarray, float]],
+                 use_rsr: bool = False,
+                 threshold: float = 0.5
+                 ) -> NoReturn:
 
         super().__init__(X, W, y, init, hypers)
         rank = np.linalg.matrix_rank(Q)
@@ -69,63 +47,62 @@ class ICAR(MCMCModelBase):
             self._eta = self.init["eta"]
         else:
             # RSR model specific attributes
-            XTX_i = inv(X.T.dot(X), overwrite_a=True, check_finite=False)
-            P = -X.dot(XTX_i).dot(X.T)
+            XTX_i = inv(X.T @ X, overwrite_a=True, check_finite=False)
+            P = -multi_dot([X, XTX_i, X.T])
             P[np.diag_indices(self._n)] += 1
             # above 2 lines equivalent to: I - X @ XTX @ XT
             A = self.Q
             A.data = -A.data
             A.setdiag(np.zeros(self._n))
-            Omega = self._n * P.dot(A.dot(P)) / A.sum()
-            # return eigen vectors of Omega and keep first q columns
-            # corresponding to the q largest eigenvalues of Omega greater
+            omega = self._n * (P @ A @ P) / A.sum()
+            # return eigen vectors of omega and keep first q columns
+            # corresponding to the q largest eigenvalues of omega greater
             # than the specified threshold
-            w, v = eigh(Omega, overwrite_a=True, check_finite=False)
+            w, v = eigh(omega, overwrite_a=True, check_finite=False)
             w, v = w[::-1], np.fliplr(v)  # order eigens in descending order
             _msg = "threshold value needs to be between 0 and 1 (incl.)"
-            assert threshold >= 0 and threshold <=1, _msg
+            assert threshold >= 0 and threshold <= 1, _msg
             q = len(w[w >= threshold])  # number of eigenvalues > threshold
             assert q > 0, "Threshold is set too high. Please lower it."
             print("dimension reduced from {0}->{1}".format(Q.shape[0], q))
-            self._K = v[:,:q]  # keep first q eigenvectors of ordered eigens
-            self.Minv = self._K.T.dot(Q.dot(self._K))
-            self._Ks = self._K[:self._s] # K sub-matrix for surveyed sites
-            self.Q = self.Minv # replace Q with Minv in the underlying ICAR
-            self._shape = hypers["i_1"] + 0.5 * q #set new shape parameter using the _shape method
-            #theta initial values
+            self._K = v[:, :q]  # keep first q eigenvectors of ordered eigens
+            self.Minv = self._K.T @ Q @ self._K
+            self._Ks = self._K[:self._s]  # K sub-matrix for surveyed sites
+            self.Q = self.Minv  # replace Q with Minv in the underlying ICAR
+            self._shape = hypers["i_1"] + 0.5 * q
+            # theta initial values
             try:
                 self._theta = init["theta"]
-            except:
+            except AttributeError:
                 self._theta = np.random.normal(0, 1, q)
 
+    def _omega_a_update(self) -> NoReturn:
 
-    def _omega_a_update(self):
-
-        Wk_alpha = self._Wc.T.dot(self._alpha)
+        Wk_alpha = self._Wc.T @ self._alpha
         self._omega_a = np.empty_like(Wk_alpha)
         pg.pgdrawv(np.ones_like(self._omega_a), Wk_alpha, self._omega_a)
 
+    def _omega_b_update(self,
+                        vec: np.ndarray,
+                        nonspat: bool = False
+                        ) -> NoReturn:
 
-    def _omega_b_update(self, vec, nonspat=False):
-        
         if nonspat:
-            pg.pgdrawv(self._ones, self.X.dot(self._beta), self._omega_b)
+            pg.pgdrawv(self._ones, self.X @ self._beta, self._omega_b)
         else:
-            pg.pgdrawv(self._ones, self.X.dot(self._beta) + vec, self._omega_b)
-        
-    
-    def _tau_update(self, vec):
+            pg.pgdrawv(self._ones, self.X @ self._beta + vec, self._omega_b)
 
-        rate = 0.5 * vec.dot(self.Q.dot(vec)) + self.hypers["i_2"]
+    def _tau_update(self, vec: np.ndarray) -> NoReturn:
+
+        rate = 0.5 * vec @ self.Q @ vec + self.hypers["i_2"]
         self._tau = np.random.gamma(shape=self._shape, scale=1 / rate)
 
-
-    def _eta_update(self):
-        #Cong et al method
+    def _eta_update(self) -> NoReturn:
+        # Cong et al method
         prec = self.Q.copy()
         prec.data = prec.data * self._tau
         prec.setdiag(prec.diagonal() + self._omega_b)
-        b = self._k - self._omega_b * self.X.dot(self._beta)
+        b = self._k - self._omega_b * self.X @ self._beta
         s, L = affine_sample(b, prec, return_factor=True)
 
         try:
@@ -133,10 +110,10 @@ class ICAR(MCMCModelBase):
             xz = L.solve_A(rhs)
 
         except AttributeError:
-            
+
             xz = splu(
-                prec, 
-                permc_spec='MMD_AT_PLUS_A', 
+                prec,
+                permc_spec='MMD_AT_PLUS_A',
                 options=dict(SymmetricMode=True)
             ).solve(np.column_stack((s, self._ones)))
 
@@ -145,12 +122,12 @@ class ICAR(MCMCModelBase):
             a = -a[0] / a[1]
             self._eta = xz[:, 0] + a * xz[:, 1]
 
+    def _theta_update(self) -> NoReturn:
 
-    def _theta_update(self):
-
+        k = self._k[:self._s]
         omega = self._omega_b[:self._s]
-        prec = self._tau * self.Minv + np.dot(self._Ks.T * omega, self._Ks)
-        b = self._Ks.T.dot(self._k[:self._s] - omega * (self.Xs.dot(self._beta)))
+        prec = self._tau * self.Minv + (self._Ks.T * omega) @ self._Ks
+        b = self._Ks.T @ (k - omega * (self.Xs @ self._beta))
         prec_theta, L = affine_sample(b, prec, return_factor=True)
         x = tri_solve(
             L,
@@ -160,111 +137,115 @@ class ICAR(MCMCModelBase):
             check_finite=False
         )
         self._theta = tri_solve(
-            L, 
-            x, 
-            trans=1, 
-            lower=True, 
-            overwrite_b=True, 
+            L,
+            x,
+            trans=1,
+            lower=True,
+            overwrite_b=True,
             check_finite=False
         )
 
+    def _Wk_update(self) -> NoReturn:
 
-    def _Wk_update(self):
-        
         z_ind = np.where(self._z[:self._s] == 1)[0]
         self._Wc = CustomDict(self.W).slice(z_ind).T
         self._kc = CustomDict(self.y).slice(z_ind) - 0.5
 
-
-    def _alpha_update(self):
+    def _alpha_update(self) -> NoReturn:
 
         a_mu, a_prec = self.hypers["a_mu"], self.hypers["a_prec"]
-        prec = np.dot(self._Wc * self._omega_a, self._Wc.T) + a_prec
-        b = np.dot(a_prec, a_mu) + np.dot(self._Wc, self._kc)
-        prec_alpha, L = affine_sample(b, prec, return_factor=True)  
+        prec = (self._Wc * self._omega_a) @ self._Wc.T + a_prec
+        b = a_prec @ a_mu + self._Wc @ self._kc
+        prec_alpha, L = affine_sample(b, prec, return_factor=True)
         x = tri_solve(
-            L, 
-            prec_alpha, 
-            lower=True, 
-            overwrite_b=True, 
+            L,
+            prec_alpha,
+            lower=True,
+            overwrite_b=True,
             check_finite=False
         )
         self._alpha = tri_solve(
-            L, 
-            x, 
-            trans=1, 
-            lower=True, 
-            overwrite_b=True, 
+            L,
+            x,
+            trans=1,
+            lower=True,
+            overwrite_b=True,
             check_finite=False
         )
 
+    def _beta_update(self, vec: np.ndarray) -> NoReturn:
 
-    def _beta_update(self, vec):
-        
+        k = self._k[:self._s]
+        vec = vec[:self._s]
         omega = self._omega_b[:self._s]
         b_mu, b_prec = self.hypers["b_mu"], self.hypers["b_prec"]
-        prec = np.dot(self.Xs.T * omega, self.Xs) + b_prec
-        b = np.dot(self.Xs.T, self._k[:self._s] - omega * vec[:self._s])\
-            + np.dot(b_prec, b_mu)
-        prec_beta, L = affine_sample(b, prec, return_factor=True)  
+        prec = (self.Xs.T * omega) @ self.Xs + b_prec
+        b = self.Xs.T @ (k - omega * vec) + b_prec @ b_mu
+        prec_beta, L = affine_sample(b, prec, return_factor=True)
         x = tri_solve(
-            L, 
-            prec_beta, 
-            lower=True, 
-            overwrite_b=True, 
+            L,
+            prec_beta,
+            lower=True,
+            overwrite_b=True,
             check_finite=False
         )
         self._beta = tri_solve(
-            L, 
-            x, 
-            trans=1, 
-            lower=True, 
-            overwrite_b=True, 
+            L,
+            x,
+            trans=1,
+            lower=True,
+            overwrite_b=True,
             check_finite=False
         )
 
-    def _z_update(self, vec, nonspat=False):
+    def _z_update(self, vec: np.ndarray, nonspat: bool = False) -> NoReturn:
 
         if nonspat:
-            occ = expit(self.X[self.not_obs].dot(self._beta))
+            occ = expit(self.X[self.not_obs] @ self._beta)
         else:
-            occ = expit(self.X[self.not_obs].dot(self._beta) + vec[self.not_obs])
+            occ = expit(self.X[self.not_obs] @ self._beta + vec[self.not_obs])
 
         self._s_probs = occ
-        omd = 1 / (1 + np.exp(self._W_.dot(self._alpha)))
-        # calculate the numerator product for each site i 
+        omd = 1 / (1 + np.exp(self._W_ @ self._alpha))
+        # calculate the numerator product for each site i
         # in the expression for the probability of z=1 | y=0
-        # _num_prod stores the product on the object self._probs.
+        # num_prod stores the product on the object self._probs.
         self._probs = occ.copy()
-        _num_prod(omd, self.not_obs, self.not_obs.shape[0], self._V,\
-                  self._probs)
+        num_prod(
+            omd, self.not_obs, self.not_obs.shape[0], self._V, self._probs
+        )
         # use the stored values to calculate the probability
         self._probs /= (1 - occ + self._probs)
         # update the occupancy state array by sampling from a Bernoulli with \
         # self._prob as its parameter value.
         self._z[self.not_obs] = np.random.binomial(n=1, p=self._probs)
-        
+
         # sampling for sites not surveyed
         if self._us > 0:
             # calc the probability of z = 1 | site i not surveyed
             if nonspat:
-                self._us_probs = expit(self.X[-self._us:].dot(self._beta))
+                self._us_probs = expit(self.X[-self._us:] @ self._beta)
             else:
-                self._us_probs = expit(self.X[-self._us:].dot(self._beta) + vec[-self._us:])
+                self._us_probs = expit(
+                    self.X[-self._us:] @ self._beta + vec[-self._us:]
+                )
             # update occupancy state by sampling from a Bernoulli(us_prob)
             self._z[-self._us:] = np.random.binomial(n=1, p=self._us_probs)
         self._k = self._z - 0.5  # update k = _z - 0.5 for next iteration
 
+    def _update_func(self,
+                     func: Callable[[], NoReturn],
+                     x: np.ndarray,
+                     y: Optional[np.ndarray] = None
+                     ) -> NoReturn:
 
-    def _update_func(self, func, x, y=None):
-        
         if y is not None:
             args = [x @ y, y]
             self._theta_update()
         else:
             args = [x]
         self._omega_b_update(args[0])
-        func() # either self._eta or self._theta
+        func()  # either self._eta or self._theta
         self._tau_update(args[-1])
         self._z_update(args[0])
         self._beta_update(args[0])
@@ -272,9 +253,8 @@ class ICAR(MCMCModelBase):
         self._omega_a_update()
         self._alpha_update()
 
-        
-    def _update_func_nonspat(self):
-        
+    def _update_func_nonspat(self) -> NoReturn:
+
         self._omega_b_update(None, nonspat=True)
         self._z_update(None, nonspat=True)
         self._beta_update(None, nonspat=True)
@@ -282,8 +262,7 @@ class ICAR(MCMCModelBase):
         self._omega_a_update()
         self._alpha_update()
 
-
-    def _params_update(self, i, nonspat=False):
+    def _params_update(self, nonspat: bool = False) -> NoReturn:
         """ Function doc """
         if nonspat:
             self._update_func_nonspat()
@@ -293,9 +272,8 @@ class ICAR(MCMCModelBase):
             except AttributeError:
                 self._update_func(self._eta_update, self._eta)
 
+    def _new_init(self, init: Dict[str, Tuple[np.ndarray, float]]) -> NoReturn:
 
-    def _new_init(self, init):
-        
         self._alpha = init["alpha"]
         self._beta = init["beta"]
         self._tau = init["tau"]
@@ -306,33 +284,41 @@ class ICAR(MCMCModelBase):
             except KeyError:
                 self._theta = np.random.normal(0, 1, self.Minv.shape[0])
 
+    def run_sampler(self,
+                    iters: int = 2000,
+                    burnin: Optional[int] = None,
+                    init: Optional[Dict[str, Tuple[np.ndarray, float]]] = None,
+                    progressbar: bool = True,
+                    nonspatial: bool = False
+                    ) -> NoReturn:
 
-    def run_sampler(self, iters=2000, burnin=None, init=None,
-                    progressbar=True, nonspatial=False):
-        
         assert iters > burnin, "iters needs to be larger than burnin."
-        
-        if init is not None: self._new_init(init)
-            
-        if burnin is None: burnin = int(0.5 * iters)  # default burnin value
 
-        if progressbar: bar = ProgressBar(iters)
-        
+        if init is not None:
+            self._new_init(init)
+
+        if burnin is None:
+            burnin = int(0.5 * iters)  # default burnin value
+
+        if progressbar:
+            bar = ProgressBar(iters)
+
         setattr(
             self, '_traces', np.empty((iters - burnin, len(self._names)))
         )
         setattr(self, 'z_mat', np.empty((iters - burnin, self._n)))
-        
+
         if self._use_rsr:
             setattr(
                 self, 'theta_mat',
                 np.empty((iters - burnin, self._K.shape[1]))
             )
-            
+
         j = 0
         for i in range(iters):
             self._params_update(i, nonspat=nonspatial)
-            if progressbar: bar.update()
+            if progressbar:
+                bar.update()
             if i >= burnin:
                 self._traces[j] = np.concatenate((
                     self._alpha,
@@ -343,7 +329,7 @@ class ICAR(MCMCModelBase):
                     self.z_mat[j] = self._z
                     if not nonspatial:
                         self.theta_mat[j] = self._theta
-                except:
+                except AttributeError:
                     pass
 
                 j += 1
