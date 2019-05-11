@@ -2,7 +2,7 @@ import ctypes
 from pathlib import Path
 import sys
 
-#from numpy.ctypeslib import ndpointer
+from numpy.ctypeslib import ndpointer
 
 # store current directory
 _currentdir = Path(__file__).resolve().parent
