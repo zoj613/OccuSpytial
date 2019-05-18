@@ -1,20 +1,21 @@
 from abc import ABC, abstractmethod
-from typing import Dict, NoReturn, Tuple
+from typing import Dict, List, Tuple
 
-import numpy as np  # type: ignore
+import numpy as np
 
 from .utils import CustomDict
 
 
 class MCMCModelBase(ABC):
 
-    def __init__(self,
-                 X: np.ndarray,
-                 W: Dict[int, np.ndarray],
-                 y: Dict[int, np.ndarray],
-                 init: Dict[str, Tuple[np.ndarray, float]],
-                 hypers: Dict[str, Tuple[np.ndarray, float]]
-                 ) -> NoReturn:
+    def __init__(
+            self,
+            X: np.ndarray,
+            W: Dict[int, np.ndarray],
+            y: Dict[int, np.ndarray],
+            init: Dict[str, Tuple[np.ndarray, float]],
+            hypers: Dict[str, Tuple[np.ndarray, float]]
+    ) -> None:
 
         self.W = W
         self.X = X
@@ -29,14 +30,14 @@ class MCMCModelBase(ABC):
         )
         self.init = init
         self.hypers = hypers
-        self.not_obs = []  # surveyed sites where species is not observed
+        self._not_obs: List[int] = []  # surveyed sites where not observed
         # initialize z, the site occupancy state
         self._z = np.ones(self._n, dtype=np.int64)
         for i in range(self._s):
             if not any(self.y[i]):
-                self.not_obs.append(i)
+                self._not_obs.append(i)
                 self._z[i] = 0.0
-        self.not_obs = np.array(self.not_obs, dtype=np.int64)
+        self.not_obs: np.ndarray = np.array(self._not_obs, dtype=np.int64)
         # array to store prob updates for sites where species is not obversed
         self._probs = np.zeros(self.not_obs.size, dtype=np.float64)
         # array to store occupancy prob for sites where species is unsurveyed
@@ -45,7 +46,7 @@ class MCMCModelBase(ABC):
         # stacked W matrix for all sites where species is not observed
         self._W_ = CustomDict(self.W).slice(self.not_obs)
 
-        self._names = []
+        self._names: List[str] = []
         for i in range(W[0].shape[1]):
             self._names.append(r"$\alpha_{0}$".format(i))
         for i in range(X.shape[1]):
@@ -59,17 +60,17 @@ class MCMCModelBase(ABC):
         self.avg_occ_probs = np.ones(self._n)
 
     @abstractmethod
-    def _alpha_update(self):
+    def _alpha_update(self) -> None:
         pass
 
     @abstractmethod
-    def _beta_update(self):
+    def _beta_update(self) -> None:
         pass
 
     @abstractmethod
-    def _z_update(self):
+    def _z_update(self) -> None:
         pass
 
     @abstractmethod
-    def run_sampler(self, iters: int = 2000):
+    def run_sampler(self, iters: int = 2000) -> None:
         pass

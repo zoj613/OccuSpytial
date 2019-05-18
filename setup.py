@@ -22,16 +22,13 @@ setup(
     long_description_content_type="text/markdown",
     license='BSD',
     url="https://github.com/zoj613/OccuSpytial",
-    install_requires=[
-        'loky', 'beautifultable', 'pypolyagamma',
-    ],
+    install_requires=['loky', 'beautifultable', 'pypolyagamma'],
     extras_require={
         'fast sparse matrix cholesky factorization': ['scikit-sparse']
     },
     packages=find_packages(),
     include_package_data=True,
     classifiers=[
-        'Programming Language :: Python :: 3.5'
         'Programming Language :: Python :: 3.6',
         'Development Status :: 3 - Alpha',
         'Environment :: Console',

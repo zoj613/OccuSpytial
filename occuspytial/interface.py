@@ -1,5 +1,5 @@
 from multiprocessing import cpu_count
-from typing import Any, Dict, NoReturn, Optional, Tuple
+from typing import Dict, Optional, Tuple, Union
 from warnings import simplefilter
 
 from beautifultable import BeautifulTable
@@ -9,7 +9,7 @@ import numpy as np  # type: ignore
 from scipy.signal import welch as specdensity
 from scipy.stats import gaussian_kde
 
-from .icar.model import ICAR
+from .icar.model import ICAR, ParamType
 from .utils.utils import acf
 
 simplefilter('ignore', UserWarning)
@@ -19,17 +19,18 @@ plt.style.use('ggplot')
 class Sampler:
     """ Class doc """
 
-    def __init__(self,
-                 X: np.ndarray,
-                 W: Dict[int, np.ndarray],
-                 y: Dict[int, np.ndarray],
-                 Q: np.ndarray,
-                 init: Dict[str, Tuple[np.ndarray, float]],
-                 hypers: Dict[str, Tuple[np.ndarray, float]],
-                 model: str = 'icar',
-                 chains: int = 2,
-                 threshold: float = 0.
-                 ) -> NoReturn:
+    def __init__(
+            self,
+            X: np.ndarray,
+            W: Dict[int, np.ndarray],
+            y: Dict[int, np.ndarray],
+            Q: np.ndarray,
+            init: ParamType,
+            hypers: ParamType,
+            model: str = 'icar',
+            chains: int = 2,
+            threshold: float = 0.
+    ) -> None:
 
         self.mode = model
         self.n_chains = chains
@@ -38,17 +39,16 @@ class Sampler:
         if model.lower() == 'icar':
             self.model = ICAR(X, W, y, Q, init, hypers)
         elif model.lower() == 'rsr':
-            self.model = ICAR(X, W, y, Q, init, hypers,
-                              use_rsr=True, threshold=threshold)
+            self.model = ICAR(
+                X, W, y, Q, init, hypers, use_rsr=True, threshold=threshold
+            )
         else:
             raise Exception("model choice can only be 'icar' or 'rsr'")
         self._names = self.model._names
         self.fullchain = np.array(self._names, ndmin=2)
         self.occ_probs = np.zeros(self.model._n)
 
-    def _new_inits(self,
-                   init: Dict[str, Tuple[np.ndarray, float]]
-                   ) -> None:
+    def _new_inits(self, init: ParamType) -> None:
         """ Function doc """
         self.inits = [init]
         for _ in range(1, self.n_chains):
@@ -66,19 +66,30 @@ class Sampler:
                 _init[key] = value
             self.inits.append(_init)
 
-    def _get_samples(self, args: Tuple[Any]) -> Tuple[np.ndarray, np.ndarray]:
+    def _get_samples(
+            self,
+            args: Tuple[
+                ICAR,
+                int,
+                Union[int, None],
+                Union[ParamType, None],
+                bool,
+                bool
+            ]
+    ) -> Tuple[np.ndarray, np.ndarray]:
         """ Function doc """
         model, iters, burnin, init, progressbar, nonspat = args
         model.run_sampler(iters, burnin, init, progressbar, nonspat)
         return model._traces, model.z_mat.mean(axis=0)
 
-    def run(self,
+    def run(
+            self,
             iters: int = 1000,
             burnin: Optional[int] = None,
-            new_init: Optional[Dict[str, Tuple[np.ndarray, float]]] = None,
+            new_init: Optional[ParamType] = None,
             progressbar: bool = True,
             nonspatial: bool = False
-            ) -> None:
+    ) -> None:
 
         executor = get_reusable_executor(max_workers=cpu_count())
 
@@ -98,11 +109,12 @@ class Sampler:
 
         self.occ_probs /= self.n_chains
 
-    def trace_plots(self,
-                    show: bool = True,
-                    save: bool = False,
-                    name: str = 'traces'
-                    ) -> None:
+    def trace_plots(
+            self,
+            show: bool = True,
+            save: bool = False,
+            name: str = 'traces'
+    ) -> None:
 
         traces = self.fullchain
         if self.nonspat:
@@ -119,22 +131,27 @@ class Sampler:
 
             s_data = sorted(data)
             plt.plot(s_data, gaussian_kde(data).pdf(s_data), linewidth=2)
-            plt.hist(data, bins=55, density=True, histtype='stepfilled',
-                     color='red', alpha=0.3)
+            plt.hist(
+                data,
+                bins=55,
+                density=True,
+                histtype='stepfilled',
+                color='red',
+                alpha=0.3
+            )
             plt.ylabel('')
         plt.tight_layout()
         if save:
-            plt.savefig(
-                '{}.svg'.format(name), format='svg', bbox_inches='tight'
-            )
+            plt.savefig(name, format='svg', bbox_inches='tight')
         plt.show() if show else plt.clf()
 
-    def corr_plots(self,
-                   num_lags: int = 50,
-                   show: bool = True,
-                   save: bool = False,
-                   name: str = 'corr'
-                   ) -> None:
+    def corr_plots(
+            self,
+            num_lags: int = 50,
+            show: bool = True,
+            save: bool = False,
+            name: str = 'corr'
+    ) -> None:
 
         traces = self.fullchain
         if self.nonspat:
@@ -155,15 +172,13 @@ class Sampler:
             ymaxs = [y - 0.05 if y > 0 else y + 0.05 for y in lagdata]
             plt.vlines(np.arange(num_lags + 1), ymin=0, ymax=ymaxs, color='k')
             plt.hlines(y=0, xmin=-1, xmax=num_lags + 1, color='C0')
-            plt.title("acf of {}".format(self._names[i]))
+            plt.title(f"acf of {self._names[i]}")
         plt.tight_layout()
         if save:
-            plt.savefig(
-                '{}.svg'.format(name), format='svg', bbox_inches='tight'
-            )
+            plt.savefig(name, format='svg', bbox_inches='tight')
         plt.show() if show else plt.clf()
 
-    def gelman(self, chains: np.ndarray) -> np.ndarray:
+    def gelman(self, chains: np.ndarray) -> Union[None, np.ndarray]:
         """ Function doc """
         if self.n_chains == 1:
             # raise Exception("the number of chains needs to be 2 or more.")
@@ -173,15 +188,13 @@ class Sampler:
             try:
                 s = np.split(chains, self.n_chains, axis=0)
             except ValueError:
-                raise Exception("Chains need to be of equal length. \
-                                Lower of increase the number of chains.")
+                raise Exception("Chains need to be of equal length.")
             m = self.n_chains  # number of chains
             n = s[0].shape[0]  # length of each chain
             # squared differences of each chain
             sqd = [
                 (s[i].mean(axis=0) - chains.mean(axis=0)) ** 2
-                for i
-                in range(m)
+                for i in range(m)
             ]
             # calculate the between chains variances for each parameter
             b = np.stack(sqd).sum(axis=0) * s[0].shape[0] / (len(s) - 1)
@@ -196,12 +209,14 @@ class Sampler:
 
             return np.sqrt(v / w)
 
-    def geweke(self,
-               chain: np.ndarray,
-               first: float = 0.1,
-               last: float = 0.5
-               ) -> np.ndarray:
+    def geweke(
+            self,
+            chain: np.ndarray,
+            first: float = 0.1,
+            last: float = 0.5
+    ) -> np.ndarray:
         """ Function doc """
+        assert first + last <= 1, "first + last should not exceed 1"
         x1 = chain[:int(first * chain.shape[0])]
         x2 = chain[int((1 - last) * chain.shape[0]):]
         n1 = x1.shape[0]
@@ -214,8 +229,8 @@ class Sampler:
         s2 = s1
 
         for i in range(num_of_params):
-            s1[i] = specdensity(x1[:, i], nperseg=n1, scaling='density')[1][0]
-            s2[i] = specdensity(x2[:, i], nperseg=n2, scaling='density')[1][0]
+            s1[i] = specdensity(x1[:, i])[1][0]
+            s2[i] = specdensity(x2[:, i])[1][0]
 
         return (x1mean - x2mean) / np.sqrt(s1 / n1 + s2 / n2)
 

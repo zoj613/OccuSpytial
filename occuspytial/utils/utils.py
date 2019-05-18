@@ -1,7 +1,7 @@
 from datetime import timedelta
 import sys
 import time
-from typing import Any, List, NoReturn, Optional, Sequence, Tuple, Union
+from typing import Any, List, Optional, Sequence, Tuple, Union
 
 import numpy as np  # type: ignore
 from numpy.random import standard_normal as std_norm
@@ -17,7 +17,7 @@ class ProgressBar:
     """ Class doc """
     BAR_LENGTH = 25
 
-    def __init__(self, n: int) -> NoReturn:
+    def __init__(self, n: int) -> None:
         """ Class initialiser """
         if sys.stdout.isatty():  # check if script is running from console
             self._FILE = open(sys.stdout.fileno(), mode='w', encoding='utf8')
@@ -73,10 +73,11 @@ class ProgressBar:
             print()
 
 
-def affine_sample(mean: np.ndarray,
-                  cov: Union[csc_matrix, np.ndarray],
-                  return_factor: bool = False
-                  ) -> Union[csc_matrix, np.ndarray]:
+def affine_sample(
+        mean: np.ndarray,
+        cov: Union[csc_matrix, np.ndarray],
+        return_factor: bool = False
+) -> Union[Tuple[np.ndarray, sp_chol], np.ndarray]:
     """ Function doc """
     try:
         factor = sp_chol(cov, mode="supernodal")
@@ -122,16 +123,15 @@ class SpatialStructure:
     """ A class intended for generating spatial precision matrix used in
     models like CAR, ICAR and RSR"""
 
-    def __init__(self, n: int) -> NoReturn:
+    def __init__(self, n: int) -> None:
         """ Class initialiser """
         self.n = n
-        self.lattice = None
-        self.A = None
 
-    def _generate_random_lattice(self,
-                                 n: Optional[int] = None,
-                                 fix_square: bool = False
-                                 ) -> None:
+    def _generate_random_lattice(
+            self,
+            n: Optional[int] = None,
+            fix_square: bool = False
+    ) -> None:
         """ Function doc """
         if n is not None:
             a = n
@@ -154,10 +154,11 @@ class SpatialStructure:
         # create a lattice rectangular grid of dims factors[0] x factors[1]
         self.lattice = np.arange(1, a + 1).reshape(factors)
 
-    def _neighbor_indx(self,
-                       indx: Tuple[int],
-                       n_type: int = 4
-                       ) -> List[Tuple[int]]:
+    def _neighbor_indx(
+            self,
+            indx: Tuple[int],
+            n_type: int = 4
+    ) -> List[Tuple[int]]:
         """ Function doc """
         assert n_type in [4, 8], "n_type must be 4 or 8"
         out = []
@@ -178,7 +179,7 @@ class SpatialStructure:
                 out.remove(tuple(item))
         return out
 
-    def _adjacency_matrix(self, n_type: int = 4) -> None:
+    def _adjacency_matrix(self, n_type: int = 48) -> None:
         """ use the generated lattice to create an adjacency matrix A, where
         an element A[i, j] = 1 if i and j are neighbors and A[i, j] = 0
         otherwise for i =/= j. A[i, i] = 0 for all i."""
@@ -187,11 +188,9 @@ class SpatialStructure:
             a[site - 1, site - 1] = 0
             # randomly decide the maximum number of neighbors for site.
             if n_type == 'mixed':
-
                 type_of_neighbor = np.random.choice([4, 8], p=[0.5, 0.5])
                 neighbor_indx = self._neighbor_indx(indx, type_of_neighbor)
             else:
-
                 neighbor_indx = self._neighbor_indx(indx, n_type)
 
             for row, col in neighbor_indx:
@@ -203,11 +202,12 @@ class SpatialStructure:
                     continue
         self.A = a
 
-    def spatial_precision(self,
-                          n_type: Union[str, int] = 'mixed',
-                          rho: int = 1,
-                          square_lattice: bool = False
-                          ) -> np.ndarrays:
+    def spatial_precision(
+            self,
+            n_type: int = 48,
+            rho: int = 1,
+            square_lattice: bool = False
+    ) -> np.ndarrays:
         """ Function doc """
         self._generate_random_lattice(fix_square=square_lattice)
         self._adjacency_matrix(n_type)
