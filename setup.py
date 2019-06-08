@@ -8,7 +8,7 @@ ext = [
    )
 ]
 
-with open("README.rst", "r") as fh:
+with open("README.rst", "r", encoding="utf-8") as fh:
     long_description = fh.read()
 
 descr = 'A package for bayesian analysis of spatial occupancy models'
