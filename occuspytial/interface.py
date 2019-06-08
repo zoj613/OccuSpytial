@@ -306,7 +306,7 @@ class Sampler:
             last: float = 0.5
     ) -> np.ndarray:
         """Performs the Geweke convergence diagnostics test.
-        
+
         In this implementation the Spectral density used to estimate the
         variance of the sample is estimated using SciPy's welch method
         from the signal submodule.
@@ -317,7 +317,7 @@ class Sampler:
                 Defaults to 0.1.
             last (float, optional): The last portion of the samples.
                 Defaults to 0.5.
-        
+
         Returns:
             np.ndarray: Test values for each parameter.
         """
@@ -348,14 +348,14 @@ class Sampler:
         a BeautifulTable object.
 
         An example table:
-          param      mean      std       2.5%     97.5%   PSRF  geweke 
-        alpha_0    -0.101    0.236     -0.563      0.36  1.011   4.958 
-        alpha_1     1.689    0.299      1.103     2.275  1.002  -0.169 
-         beta_0     0.216    0.309      -0.39     0.822  1.001   5.408 
-         beta_1    -0.382    0.328     -1.026     0.261  0.999   -1.39 
-         beta_2     -0.08    0.314     -0.696     0.536  1.004  -1.663 
-            PAO     0.547    0.052      0.445      0.65    1.0    4.84 
-            tau  1013.798  1453.14  -1834.357  3861.952  1.001   2.112 
+          param      mean      std       2.5%     97.5%   PSRF  geweke
+        alpha_0    -0.101    0.236     -0.563      0.36  1.011   4.958
+        alpha_1     1.689    0.299      1.103     2.275  1.002  -0.169
+         beta_0     0.216    0.309      -0.39     0.822  1.001   5.408
+         beta_1    -0.382    0.328     -1.026     0.261  0.999   -1.39
+         beta_2     -0.08    0.314     -0.696     0.536  1.004  -1.663
+            PAO     0.547    0.052      0.445      0.65    1.0    4.84
+            tau  1013.798  1453.14  -1834.357  3861.952  1.001   2.112
         """
         table = BeautifulTable(default_alignment=BeautifulTable.ALIGN_RIGHT)
         table.set_style(BeautifulTable.STYLE_NONE)
