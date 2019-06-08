@@ -14,7 +14,7 @@ from .utils.utils import acf
 
 simplefilter('ignore', UserWarning)
 plt.style.use('ggplot')
-
+ArgsType = Tuple[ICAR, int, Union[int, None], Union[ParamType, None], bool, bool]
 
 class Sampler:
     """ Class doc """
@@ -66,17 +66,7 @@ class Sampler:
                 _init[key] = value
             self.inits.append(_init)
 
-    def _get_samples(
-            self,
-            args: Tuple[
-                ICAR,
-                int,
-                Union[int, None],
-                Union[ParamType, None],
-                bool,
-                bool
-            ]
-    ) -> Tuple[np.ndarray, np.ndarray]:
+    def _get_samples(self, args: ArgsType) -> Tuple[np.ndarray, np.ndarray]:
         """ Function doc """
         model, iters, burnin, init, progressbar, nonspat = args
         model.run_sampler(iters, burnin, init, progressbar, nonspat)
