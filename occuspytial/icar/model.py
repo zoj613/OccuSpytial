@@ -322,7 +322,7 @@ class ICAR(MCMCModelBase):
 
         j = 0
         for i in range(iters):
-            self._params_update(i, nonspat=nonspatial)
+            self._params_update(nonspatial)
             if progressbar:
                 bar.update()
             if i >= burnin:
