@@ -14,7 +14,10 @@ from .utils.utils import acf
 
 simplefilter('ignore', UserWarning)
 plt.style.use('ggplot')
-ArgsType = Tuple[ICAR, int, Union[int, None], Union[ParamType, None], bool, bool]
+ArgsType = Tuple[
+    ICAR, int, Union[int, None], Union[ParamType, None], bool, bool
+]
+
 
 class Sampler:
     """ Class doc """
