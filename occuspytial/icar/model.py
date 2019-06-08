@@ -75,7 +75,7 @@ class ICAR(MCMCModelBase):
             # theta initial values
             try:
                 self._theta = init["theta"]
-            except AttributeError:
+            except KeyError:
                 self._theta = np.random.normal(0, 1, q)
 
     def _omega_a_update(self) -> None:
