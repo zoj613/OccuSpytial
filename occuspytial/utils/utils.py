@@ -8,7 +8,7 @@ from numpy.random import standard_normal as std_norm
 from scipy.linalg import cholesky as chol
 from scipy.sparse import csc_matrix, issparse
 try:
-    from sksparse.cholmod import cholesky as sp_chol
+    from sksparse.cholmod import Factor, cholesky as sp_chol
 except ImportError:
     pass
 
@@ -77,7 +77,7 @@ def affine_sample(
         mean: np.ndarray,
         cov: Union[csc_matrix, np.ndarray],
         return_factor: bool = False
-) -> Union[Tuple[np.ndarray, sp_chol], np.ndarray]:
+) -> Union[Tuple[np.ndarray, Factor], np.ndarray]:
     """ Function doc """
     try:
         factor = sp_chol(cov, mode="supernodal")
@@ -187,7 +187,7 @@ class SpatialStructure:
         for indx, site in np.ndenumerate(self.lattice):
             a[site - 1, site - 1] = 0
             # randomly decide the maximum number of neighbors for site.
-            if n_type == 'mixed':
+            if n_type == 48:
                 type_of_neighbor = np.random.choice([4, 8], p=[0.5, 0.5])
                 neighbor_indx = self._neighbor_indx(indx, type_of_neighbor)
             else:
@@ -207,7 +207,7 @@ class SpatialStructure:
             n_type: int = 48,
             rho: int = 1,
             square_lattice: bool = False
-    ) -> np.ndarrays:
+    ) -> np.ndarray:
         """ Function doc """
         self._generate_random_lattice(fix_square=square_lattice)
         self._adjacency_matrix(n_type)

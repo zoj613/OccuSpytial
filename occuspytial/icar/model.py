@@ -38,7 +38,7 @@ class ICAR(MCMCModelBase):
         self._Wc = None
         self._kc = None
         # constant shape parameter for _tau_update method
-        self._default_shape = self.hypers["i_1"] + 0.5 * rank
+        self._shape = self.hypers["i_1"] + 0.5 * rank
         # attributes specific to omega_b update method
         self._omega_a = None
         self._omega_b = np.empty(self._n)
@@ -105,7 +105,7 @@ class ICAR(MCMCModelBase):
         prec = self.Q.copy()
         prec.data = prec.data * self._tau
         prec.setdiag(prec.diagonal() + self._omega_b)
-        b = self._k - self._omega_b * self.X @ self._beta
+        b = self._k - self._omega_b * (self.X @ self._beta)
         s, sp_chol_factor = affine_sample(b, prec, return_factor=True)
 
         try:
