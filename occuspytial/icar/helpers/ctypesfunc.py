@@ -1,18 +1,18 @@
 import ctypes
-from pathlib import Path
+from pathlib import Path, PosixPath
 import sys
 
 from numpy.ctypeslib import ndpointer
 
 # store current directory
-_currentdir = Path(__file__).resolve().parent
-platform = sys.platform
-if platform == "linux":
-    _sharedlib_path = _currentdir / "ctypes_helper.so"
-elif platform == "darwin":
-    _sharedlib_path = _currentdir / "ctypes_helper.dylib"
-elif platform in ["win32", "cygwin"]:
-    _sharedlib_path = _currentdir / "ctypes_helper.dll"
+_currentdir = Path(__file__).parent
+_platform = sys.platform  # get the _platform's name
+if _platform == "linux":
+    _sharedlib_path = next(_currentdir.glob("*.so"))
+elif _platform == "darwin":
+    _sharedlib_path = next(_currentdir.glob("*.dylib"))
+elif _platform in ["win32", "cygwin"]:
+    _sharedlib_path = next(_currentdir.glob("*.dll"))
 else:
     raise Exception("Platform is not supported.")
 
