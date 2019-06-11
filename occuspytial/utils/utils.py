@@ -101,13 +101,12 @@ def affine_sample(
     covariance matrix using Affine transformation / "reparameterization
     trick".
 
-    
     Args:
         mean (np.ndarray): A mean vector.
         cov (Union[csc_matrix, np.ndarray]): Covariance matrix
         return_factor (bool, optional): Whether or not the function
         . Defaults to False.
-    
+
     Returns:
         Union[Tuple[np.ndarray, Factor], np.ndarray]: A random sample
             from the multivariate normal distribution together with the
@@ -156,7 +155,7 @@ def acf(x: np.ndarray, lag: int = 0) -> float:
     elif lag < len(x) - 1:
         return np.corrcoef(x[:-lag], x[lag:])[0, 1]
     else:
-        raise Exception(f"lag must be less than {}".format(len(x) - 1))
+        raise Exception(f"lag must be less than {len(x) - 1}")
 
 
 class CustomDict(dict):
@@ -246,11 +245,11 @@ class SpatialStructure:
         """Given an integer index of a site on a lattice grid, return
         site's neighbors' indices. The neighborhood structure can either
         be 4 neighbors or 8 neighbors.
-        
+
         Args:
             indx (Tuple[int]): The current sites's index as a tuple (x, y)
             n_type (int, optional): Number of neighbors. Defaults to 4.
-        
+
         Returns:
             List[Tuple[int]]: A list of tuple indices for each of the
             n_type neighbors of the current site.
@@ -287,7 +286,7 @@ class SpatialStructure:
 
         Raises:
             IndexError: if another element is not one of the current
-                element's neighbors.   
+                element's neighbors.
         """
         a = np.zeros((self.n, self.n))
         for indx, site in np.ndenumerate(self.lattice):
@@ -328,7 +327,7 @@ class SpatialStructure:
             square_lattice (bool, optional): Whether or not the lattice
                 should be square. A false value will return a rectangular
                 lattice. Defaults to False.
-        
+
         Returns:
             np.ndarray: A spatial precision matrix of size n by n.
         """
