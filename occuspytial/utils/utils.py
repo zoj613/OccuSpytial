@@ -150,6 +150,7 @@ def acf(x: np.ndarray, lag: int = 0) -> float:
     Returns:
         float: The sample autocorrelation of x.
     """
+    lag = abs(lag)  # ensure function works with negative lag values.
     if lag == 0:
         return 1
     elif lag < len(x) - 1:
@@ -161,7 +162,7 @@ def acf(x: np.ndarray, lag: int = 0) -> float:
 class CustomDict(dict):
     """
     A custom dictionary that supports indexing via its keys. The index
-    can be any iterable e.g., numpy array, list, tuple.
+    can be *args or any iterable e.g., numpy array, list, tuple.
     """
     # a mix-in class for group-indexing W and y dictionaries
     def slice(self, *keys: Sequence[Any]) -> np.ndarray:
