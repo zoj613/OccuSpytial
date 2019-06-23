@@ -1,10 +1,11 @@
 from abc import ABC, abstractmethod
-from typing import Dict, List
+from typing import Dict, List, Union
 
 import numpy as np
 
 from .utils import CustomDict
-from ..icar.model import ParamType
+
+ParamType = Dict[str, Union[np.ndarray, float]]
 
 
 class MCMCModelBase(ABC):

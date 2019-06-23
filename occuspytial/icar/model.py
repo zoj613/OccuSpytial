@@ -1,4 +1,4 @@
-from typing import Callable, Dict, Optional, Union
+from typing import Callable, Dict, Optional
 
 import numpy as np  # type: ignore
 from numpy.linalg import multi_dot
@@ -10,10 +10,9 @@ from pypolyagamma import PyPolyaGamma
 
 from .helpers.ctypesfunc import num_prod
 from ..utils.utils import affine_sample, CustomDict, ProgressBar
-from ..utils.basemodel import MCMCModelBase
+from ..utils.basemodel import MCMCModelBase, ParamType
 
 pg = PyPolyaGamma()
-ParamType = Dict[str, Union[np.ndarray, float]]
 
 
 class ICAR(MCMCModelBase):
