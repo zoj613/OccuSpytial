@@ -1,20 +1,48 @@
 from abc import ABC, abstractmethod
-from typing import Dict, List, Tuple
+from typing import Dict, List
 
 import numpy as np
 
 from .utils import CustomDict
+from ..icar.model import ParamType
 
 
 class MCMCModelBase(ABC):
+    """A base class for instantiating a site occupancy model.
 
+    Attributes:
+        W (Dict[int, np.ndarray]): The detection process design matrices
+            for each site stored as a dictionary. The key is the site
+            number while the value is the design matrix of that site
+            stored as a 2D numpy array.
+        X (np.ndarray): The occupancy process design matrix.
+        y (np.ndarray): The detection/non-detection data for each site
+            stored as a dictionary. The key is the site number and the
+            value of each key is a 1D numpy array whose length is the
+            number of time the site was visited. The value are 1's (if
+            a species was observed on that particular visit) and 0's (
+            if a species was not observed).
+        Xs (np.ndarray): A subset of the occupancy process design matrix
+            for sites that were surveyed out of the total.
+        init (ParamType): The initial values of model parameters.
+        hypers (ParamType): The hyperparameters of the model.
+        not_obs (np.ndarray): A 1D array whose entries are the site
+            numbers where the species was not observed at all on any
+            visit.
+        avg_occ_probs (np.ndarray): The average occupancy probability of
+            each site.
+
+    Methods:
+        run_sampler: An abstract method to define the posterior sampling
+        process of a Bayesian model.
+    """
     def __init__(
             self,
             X: np.ndarray,
             W: Dict[int, np.ndarray],
             y: Dict[int, np.ndarray],
-            init: Dict[str, Tuple[np.ndarray, float]],
-            hypers: Dict[str, Tuple[np.ndarray, float]]
+            init: ParamType,
+            hypers: ParamType
     ) -> None:
 
         self.W = W
@@ -45,7 +73,7 @@ class MCMCModelBase(ABC):
         self._us_probs = np.zeros(self._us, dtype=np.float64)
         # stacked W matrix for all sites where species is not observed
         self._W_ = CustomDict(self.W).slice(self.not_obs)
-
+        # store parameter names to be used in plot labels.
         self._names: List[str] = []
         for i in range(W[0].shape[1]):
             self._names.append(r"$\alpha_{0}$".format(i))
@@ -54,9 +82,9 @@ class MCMCModelBase(ABC):
         # specify the names of the posterior parameters
         self._names.append("PAO")
         self._names.append(r"$\tau$")
-        self._alpha = init["alpha"]
-        self._beta = init["beta"]
-        self._tau = init["tau"]
+        self._alpha = init["alpha"]  # inital values for alpha
+        self._beta = init["beta"]  # initial values for beta
+        self._tau = init["tau"]  # initial values for tau
         self.avg_occ_probs = np.ones(self._n)
 
     @abstractmethod
