@@ -251,14 +251,19 @@ class SpatialStructure:
             indx (Tuple[int]): The current sites's index as a tuple (x, y)
             n_type (int, optional): Number of neighbors. Defaults to 4.
 
+        Raises:
+            Exception: if the number of neighbors supplied as input is
+                not one of 4 and 8.
+
         Returns:
             List[Tuple[int]]: A list of tuple indices for each of the
             n_type neighbors of the current site.
         """
-        # TODO: investigate edge cases for neighbours on the grid.
-        assert n_type in [4, 8], "n_type must be 4 or 8"
-        out = []
+        if n_type not in [4, 8]:
+            msg = "The number of neighbors specified must be one of [4, 8]"
+            raise Exception(msg)
 
+        out = []
         if n_type == 8:
             out.append((indx[0] - 1, indx[1] - 1))  # north west
             out.append((indx[0] + 1, indx[1] - 1))  # south west
@@ -270,9 +275,18 @@ class SpatialStructure:
         out.append((indx[0] - 1, indx[1]))
         out.append((indx[0] + 1, indx[1]))
 
-        for item in np.array(out):
-            if not np.all(item >= 0):
-                out.remove(tuple(item))
+        # taking care of edge cases and making sure the neighbours are
+        # all valid indices that fall within the generated lattice grid.
+        edge_case = (
+            indx[0] == 0  # current site is in first row of lattice
+            or indx[1] == 0  # is in first column of lattice
+            or indx[0] == (self.n - 1)  # is in last row of lattice
+            or indx[1] == (self.n - 1)  # is in last column of lattice
+        )
+        if edge_case:
+            for item in np.array(out):
+                if np.any(item < 0) or np.any(item >= self.n):
+                    out.remove(tuple(item))
         return out
 
     def _adjacency_matrix(self, n_type: int = 48) -> None:
