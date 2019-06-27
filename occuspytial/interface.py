@@ -20,7 +20,24 @@ ArgsType = Tuple[
 
 
 class Sampler:
-    """ Class doc """
+    """A class to perform all the inference for the ICAR and RSR models
+
+    Attributes:
+        mode (str): The model name.
+        n_chains (int): The number of chains to use when sampling.
+        inits (list): Parameter initial values for each chain.
+        fullchain (np.ndarray): The combined posterior samples from the
+            different chains.
+        occ_probs (np.ndarray): Estimated occupancy probabilities for
+            each site, using the combined samples.
+
+    Methods:
+        run: Performs the posterior sampling of parameters of interest,
+        trace_plots: Gets the trace plots of the posterior samples.
+        corr_plots: Gets the autocorrelation plots of the samples.
+        gelman: Performs the Gelman-Rubin test on the posterior samples.
+        geweke: Performs the Geweke test on the posterior samples.
+    """
 
     def __init__(
             self,
@@ -34,7 +51,26 @@ class Sampler:
             chains: int = 2,
             threshold: float = 0.
     ) -> None:
+        """
+        Args:
+            X (np.ndarray): Design matrix of the occupancy process.
+            W (Dict[int, np.ndarray]): Design matrices of the detection
+                detection process.
+            y (Dict[int, np.ndarray]): Contains the detection and non-
+                detection data for a species.
+            Q (np.ndarray): The spatial precision matrix.
+            init (ParamType): The initial values of model parameters.
+            hypers (ParamType): The hyperparameters of the model.
+            model (str, optional): The model name. Defaults to 'icar'.
+            chains (int, optional): The number of chains to use while
+                sampling. Defaults to 2.
+            threshold (float, optional): The spatial autocorrelation
+                parameter associated with choosing the size of the RSR
+                model. Defaults to 0..
 
+        Raises:
+            Exception: If unsupported model name is used as input.
+        """
         self.mode = model
         self.n_chains = chains
         self.inits = [init]
@@ -52,7 +88,7 @@ class Sampler:
         self.occ_probs = np.zeros(self.model._n)
 
     def _new_inits(self, init: ParamType) -> None:
-        """ Function doc """
+        """ Set new initial parameter values. """
         self.inits = [init]
         for _ in range(1, self.n_chains):
             # create multiple initial values for the additional chains
@@ -70,7 +106,6 @@ class Sampler:
             self.inits.append(_init)
 
     def _get_samples(self, args: ArgsType) -> Tuple[np.ndarray, np.ndarray]:
-        """ Function doc """
         model, iters, burnin, init, progressbar, nonspat = args
         model.run_sampler(iters, burnin, init, progressbar, nonspat)
         return model._traces, model.z_mat.mean(axis=0)
@@ -83,7 +118,26 @@ class Sampler:
             progressbar: bool = True,
             nonspatial: bool = False
     ) -> None:
+        """Perform the sampling of posterior parameters of the model.
+        Sampling ia done in parallel for each of the number of chains
+        specified in the 'n_chains' attribute.
 
+        Args:
+            iters (int, optional): The number of sampler iterations.
+                Defaults to 1000.
+            burnin (Optional[int]): The size of the burnin samples to be
+                thrown away. Defaults to None.
+            new_init (Optional[ParamType]): Parameter initial values to
+                use for sampling. If not supplied then the values used
+                are be the ones the class instance was initialized with.
+                Defaults to None.
+            progressbar (bool, optional): Whether or not to display the
+                progress of the sampling process in the terminal.
+                Defaults to True.
+            nonspatial (bool, optional): Whether or not to sample from
+                the model version without the spatial part included.
+                Defaults to False.
+        """
         executor = get_reusable_executor(max_workers=cpu_count())
 
         if new_init is not None:
@@ -108,7 +162,20 @@ class Sampler:
             save: bool = False,
             name: str = 'traces'
     ) -> None:
+        """Generate the traceplots of the posterior samples of the para-
+        meters of interest. The plots can be displayed in one single
+        figure on the screen and/or saved as a picture. A custom name
+        can be given to the saved file.
 
+        Args:
+            show (bool, optional): Whether to show the plot on screen.
+                Defaults to True.
+            save (bool, optional): Whether to save plot as a picture.
+                Defaults to False.
+            name (str, optional): Name of the picture if save = True.
+                The supplied input can also be a path if it is to be
+                saved in a custom directory. Defaults to 'traces'.
+        """
         traces = self.fullchain
         if self.nonspat:
             plot_rows = traces.shape[1] - 1
@@ -145,7 +212,22 @@ class Sampler:
             save: bool = False,
             name: str = 'corr'
     ) -> None:
+        """Generate the autocorrelation plots of the posterior samples
+        of the parameters of interest. The plots can be displayed in one
+        single figure on the screen and/or saved as a picture. A custom
+        name/path can be given for the saved file.
 
+        Args:
+            num_lags (int, optional): The maximum number of lags to dis-
+                play in the plot. Defaults to 50.
+            show (bool, optional): Whether to show the plot on screen.
+                Defaults to True.
+            save (bool, optional): Whether to save plot as a picture.
+                Defaults to False.
+            name (str, optional): Name of the picture if save = True.
+                The supplied input can also be a path if it is to be
+                saved in a custom directory. Defaults to 'traces'.
+        """
         traces = self.fullchain
         if self.nonspat:
             plot_rows = traces.shape[1] - 1
@@ -172,16 +254,31 @@ class Sampler:
         plt.show() if show else plt.clf()
 
     def gelman(self, chains: np.ndarray) -> Union[None, np.ndarray]:
-        """ Function doc """
+        """Perform the Gelman-Rubin convergence diagnostics test.
+
+        The test is performed using the posterior sample chains that are
+        generated. A numpy 1D-array is returned with each element
+        corresponding to a posterior parameter in the same order that
+        they appear in the fullchains attribute's first row.
+
+        Args:
+            chains (np.ndarray): The combined parameter samples.
+
+        Raises:
+            ValueError: If chains are not of equal length
+
+        Returns:
+            Union[None, np.ndarray]: If the number of chains is 1 then
+            return None, else return test values for each parameter.
+        """
         if self.n_chains == 1:
-            # raise Exception("the number of chains needs to be 2 or more.")
             return None
         else:
             # split up the big chain into multiple chains
             try:
                 s = np.split(chains, self.n_chains, axis=0)
-            except ValueError:
-                raise Exception("Chains need to be of equal length.")
+            except ValueError as ve:
+                raise Exception("Chains need to be of equal length.") from ve
             m = self.n_chains  # number of chains
             n = s[0].shape[0]  # length of each chain
             # squared differences of each chain
@@ -208,7 +305,22 @@ class Sampler:
             first: float = 0.1,
             last: float = 0.5
     ) -> np.ndarray:
-        """ Function doc """
+        """Performs the Geweke convergence diagnostics test.
+
+        In this implementation the Spectral density used to estimate the
+        variance of the sample is estimated using SciPy's welch method
+        from the signal submodule.
+
+        Args:
+            chain (np.ndarray): The posterior samples of the parameters.
+            first (float, optional): The first portion of the samples.
+                Defaults to 0.1.
+            last (float, optional): The last portion of the samples.
+                Defaults to 0.5.
+
+        Returns:
+            np.ndarray: Test values for each parameter.
+        """
         assert first + last <= 1, "first + last should not exceed 1"
         x1 = chain[:int(first * chain.shape[0])]
         x2 = chain[int((1 - last) * chain.shape[0]):]
@@ -229,7 +341,22 @@ class Sampler:
 
     @property
     def summary(self) -> BeautifulTable:
+        """A summary table of the posterior sampling results.
 
+        The table can be indexed using an int, str or slice object. See
+        beatifultable documentation for more information on how to index
+        a BeautifulTable object.
+
+        An example table:
+          param      mean      std       2.5%     97.5%   PSRF  geweke
+        alpha_0    -0.101    0.236     -0.563      0.36  1.011   4.958
+        alpha_1     1.689    0.299      1.103     2.275  1.002  -0.169
+         beta_0     0.216    0.309      -0.39     0.822  1.001   5.408
+         beta_1    -0.382    0.328     -1.026     0.261  0.999   -1.39
+         beta_2     -0.08    0.314     -0.696     0.536  1.004  -1.663
+            PAO     0.547    0.052      0.445      0.65    1.0    4.84
+            tau  1013.798  1453.14  -1834.357  3861.952  1.001   2.112
+        """
         table = BeautifulTable(default_alignment=BeautifulTable.ALIGN_RIGHT)
         table.set_style(BeautifulTable.STYLE_NONE)
         fullchain = self.fullchain[1:].astype(np.float64)

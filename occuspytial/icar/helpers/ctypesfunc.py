@@ -1,5 +1,13 @@
+"""This module is a helper script that reads in a C shared library that
+is compiled automatically during installation of this package. The lin-
+rary helps interface the C function called "_prod" with Python and said
+function is used to speed up computation during posterior sampling when
+updating the posterior parameter values of z (occupancy state of each
+site).
+
+"""
 import ctypes
-from pathlib import Path, PosixPath
+from pathlib import Path
 import sys
 
 from numpy.ctypeslib import ndpointer
