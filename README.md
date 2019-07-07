@@ -6,41 +6,42 @@ A package for fast bayesian analysis of spatial occupancy models. OccuSpytial im
 Installation
 ------------
 currently this package can be installed by downloading the repository and running the following command on the folder with the package:
-::
+```
    git clone https://github.com/zoj613/OccuSpytial.git
    cd OccuSpytial
    python setup.py install
-   
-It is strongly recommended that you have the package :math:`scikit-sparse` installed before using this package in order to fully take advantage of the speed gains possible. Using this package with math:`scikit-sparse` installed can result in sampler speedups of roughly 14 times or more.
+```
+ 
+It is strongly recommended that you have the package `scikit-sparse` installed before using this package in order to fully take advantage of the speed gains possible. Using this package with `scikit-sparse` installed can result in sampler speedups of roughly 14 times or more.
 
 Usage
 -----
 The initializing `Sampler` class accepts:
 
-* a 2-D numpy array :math:`X` (occupancy effects design matrix).
-* a python dictionary object :math:`W` (each key-value entry is the site number and detection effects design matrix for that particular site ).
-* a python dictionary object :math:`y` (each key-value entry is the site number and an array containing the detection/non-detection info of that particular site).
-* a 2-D numpy / sparse-matrix :math:`Q` (the ICAR model precision matrix).
+* a 2-D numpy array `X` (occupancy effects design matrix).
+* a python dictionary object `W` (each key-value entry is the site number and detection effects design matrix for that particular site ).
+* a python dictionary object `y` (each key-value entry is the site number and an array containing the detection/non-detection info of that particular site).
+* a 2-D numpy / sparse-matrix `Q` (the ICAR model precision matrix).
 * Only 2 models are supported currently, namely ICAR and RSR (Reduced Spatial Regression).
-::
+```python
     >>> from occuspytial.interface import Sampler
     >>> import numpy as np
     >>> from datamodule import X, W, y, Q  # datamodule is the file with all the arrays X, W, y and Q
     # the dictionary with hyperparameters for the spatial occupancy model
-    >>> HYPERS = {
-          "a_mu": np.zeros(W[0].shape[1], dtype='float64'), 
-          "a_prec": np.diag([1. / 1000] * W[0].shape[1]),
-          "b_mu": np.zeros(X.shape[1], dtype='float64'),
-          "b_prec": np.diag([1. / 1000] * X.shape[1]),
-          "i_1": 0.5,
-          "i_2": 0.0005,
-        }
+    >>> HYPERS = dict(
+            a_mu=np.zeros(W[0].shape[1]),
+            a_prec=np.diag([1. / 1000] * W[0].shape[1]),
+            b_mu=np.zeros(X.shape[1]),
+            b_prec=np.diag([1. / 1000] * X.shape[1]),
+            i_1=0.5,
+            i_2=0.0005
+        )
     # the dictionary with initial values for parameters alpha, beta, tau & eta
     >>> INIT = {
           "alpha": np.array([0, 0.]),
           "beta": np.array([0., 0., 0]),
           "tau": 1,
-          "eta": np.random.uniform(0, 1, size=Q.shape[0])
+          "eta": np.random.uniform(-10, 10, size=Q.shape[0])
         }
     # initialize the sampler setting the number of chains to 3 and using the icar model for the spatial random effects
     # note that the chains are ran simultanously in parallel.
@@ -51,18 +52,18 @@ The initializing `Sampler` class accepts:
         100.0%[█████████████████████████] 100000/100000 [0:14:27<0:00:00, 115.21draws/s]
     # print the summary table containing the posterior estimates of the parameters, their standard errors and convergence diagnostics info
     >>> print(icarmodel.summary())
-                        mean       std      2.5%     97.5%      R_hat  Geweke_score
-        $\alpha_0$ -0.015179  0.057961 -0.125347  0.091161   1.003988     -1.333337
-        $\alpha_1$  1.734395  0.071640  1.597810  1.877713   1.003778      2.369414
-        $\beta_0$   0.156570  0.397243 -0.608351  0.930774   1.002827     -0.678714
-        $\beta_1$   2.703757  0.576002  1.704926  3.920980   1.017302      1.098281
-        $\beta_2$  -1.997502  0.518368 -3.153621 -1.100192   1.003005      0.339891
-        $\tau$      0.885988  0.344655  0.388398  1.781189   0.999137      0.697562
+          param      mean      std       2.5%     97.5%   PSRF  geweke
+        alpha_0    -0.101    0.236     -0.563      0.36  1.011   4.958
+        alpha_1     1.689    0.299      1.103     2.275  1.002  -0.169
+         beta_0     0.216    0.309      -0.39     0.822  1.001   5.408
+         beta_1    -0.382    0.328     -1.026     0.261  0.999   -1.39
+         beta_2     -0.08    0.314     -0.696     0.536  1.004  -1.663
+            PAO     0.547    0.052      0.445      0.65    1.0    4.84
+            tau  1013.798  1453.14  -1834.357  3861.952  1.001   2.112
     >>> icarmodel.trace_plots(show=True) # display the traceplots of the parameters alpha, beta, and tau.
     >>> icarmodel.corr_plots(show=True) # display the correlation plots of the parameters alpha, beta, and tau.
-    
+ ```
 TO DO
 -----
-* Add a folder with dummy data and a tutorial notebook.
-* Figure out how to display the progress bar while using this package inside ipython / ipython-notebook / jupyter-console.
+* Add a folder with dummy data and a usage example notebook.
 * Add more spatial occupancy models
