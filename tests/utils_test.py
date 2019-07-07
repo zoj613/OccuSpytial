@@ -1,12 +1,11 @@
 import pytest
 import numpy as np
-from scipy.sparse import csc_matrix, issparse
+from scipy.sparse import csc_matrix
 
 from occuspytial.utils.utils import (
     acf,
     affine_sample,
     CustomDict,
-    ProgressBar,
     SpatialStructure
 )
 
