@@ -8,7 +8,7 @@ ext = [
    )
 ]
 
-with open("README.rst", "r", encoding="utf-8") as fh:
+with open("README.md", "r", encoding="utf-8") as fh:
     long_description = fh.read()
 
 descr = 'A package for bayesian analysis of spatial occupancy models'
@@ -23,7 +23,7 @@ setup(
     license='BSD',
     url="https://github.com/zoj613/OccuSpytial",
     install_requires=[
-        'loky', 'beautifultable', 'pypolyagamma', 'matplotlib>=3.1.0'
+        'beautifultable-0.7.0', 'pypolyagamma', 'matplotlib>=3.1.0'
     ],
     extras_require={
         'fast sparse matrix cholesky factorization': ['scikit-sparse']
