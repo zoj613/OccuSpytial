@@ -1,4 +1,8 @@
 from datetime import timedelta
+import logging
+import logging.config
+import os
+from pathlib import Path
 import sys
 import time
 from typing import Any, List, Optional, Sequence, Tuple, Union
@@ -9,8 +13,11 @@ from scipy.linalg import cholesky as chol
 from scipy.sparse import csc_matrix, issparse
 try:
     from sksparse.cholmod import Factor, cholesky as sp_chol
+    import toml
 except ImportError:
     pass
+
+logger = logging.getLogger(__name__)
 
 
 class ProgressBar:
@@ -42,7 +49,7 @@ class ProgressBar:
         else:
             fill = "#"
 
-        self.start = self._now
+        self.start = time.monotonic()
         self.n = n
         self.i = 0
         self.fill = fill
@@ -64,14 +71,9 @@ class ProgressBar:
         ]
         return '{1:.1f}%[{0}] {3}/{4} [{2}<{5}, {6}draws/s]'.format(*bar)
 
-    @property
-    def _now(self) -> float:
-
-        return time.monotonic()
-
     def _elapsed_and_remaining_time(self) -> Tuple[timedelta, timedelta]:
         """Calculates the elapsed time and remaining time"""
-        now = self._now
+        now = time.monotonic()
         elapsed_time = timedelta(seconds=now - self.start)
         est_total_time = timedelta(
             seconds=self.n / self.i * (now - self.start)
@@ -122,7 +124,12 @@ def affine_sample(
     except (NameError, AttributeError):
 
         # convert the covariance into a dense matrix if it stored in
-        # a sparse format.
+        # a sparse format
+        logger.debug(
+            "Either scikit-sparse module is not in use or the covariance "
+            "matrix is a numpy array. We will use scipy routines to compute "
+            "its Cholesky factor."
+        )
         cov_dense = cov.toarray() if issparse(cov) else cov
         factor = chol(cov_dense, check_finite=False).T
         x = mean + factor @ std_norm(mean.size)
@@ -261,6 +268,7 @@ class SpatialStructure:
         """
         if n_type not in [4, 8]:
             msg = "The number of neighbors specified must be one of [4, 8]"
+            logger.error(msg)
             raise Exception(msg)
 
         out = []
@@ -284,9 +292,11 @@ class SpatialStructure:
             or indx[1] == (self.n - 1)  # is in last column of lattice
         )
         if edge_case:
+            logger.debug(f"site index {indx} is an edge case")
             for item in np.array(out):
                 if np.any(item < 0) or np.any(item >= self.n):
                     out.remove(tuple(item))
+                    logger.debug(f"removed {item} as a neighbor of {indx}")
         return out
 
     def _adjacency_matrix(self, n_type: int = 48) -> None:
@@ -314,12 +324,10 @@ class SpatialStructure:
                 neighbor_indx = self._neighbor_indx(indx, n_type)
 
             for row, col in neighbor_indx:
-                try:
-                    neighbor_site = self.lattice[row, col]
-                    a[site - 1, neighbor_site - 1] = 1
-                    a[neighbor_site - 1, site - 1] = 1
-                except IndexError:
-                    continue
+                neighbor_site = self.lattice[row, col]
+                a[site - 1, neighbor_site - 1] = 1
+                a[neighbor_site - 1, site - 1] = 1
+
         self.A = a
 
     def spatial_precision(
@@ -350,3 +358,32 @@ class SpatialStructure:
         self._adjacency_matrix(n_type)
         d_mat = np.diag(self.A.sum(axis=0))
         return d_mat - rho * self.A
+
+
+# adapated from:
+# https://fangpenlin.com/posts/2012/08/26/good-logging-practice-in-python/
+def log_config(
+    default_path: str = 'log_config.toml',
+    default_level: int = logging.DEBUG,
+    env_key: str = 'LOG_CFG'
+):
+    """Setup logging configuration"""
+    path = Path(default_path)
+    value = os.getenv(env_key, None)
+    if value:
+        path = Path(value)
+    log_directory = Path('logs')
+    if not log_directory.exists():
+        log_directory.mkdir()
+    if path.exists():
+        try:
+            _config = toml.load(path)
+            logging.config.dictConfig(_config)
+        except NameError:
+            logging.basicConfig(level=default_level)
+            logging.error(
+                "toml module could not be imported, thus custom logging config"
+                " failed. Basic logging config will be used instead."
+            )
+    else:
+        logging.basicConfig(level=default_level)
