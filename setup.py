@@ -23,7 +23,7 @@ setup(
     license='BSD',
     url="https://github.com/zoj613/OccuSpytial",
     install_requires=[
-        'beautifultable-0.7.0', 'pypolyagamma', 'matplotlib>=3.1.0'
+        'beautifultable==0.7.0', 'pypolyagamma', 'matplotlib>=3.1.0'
     ],
     extras_require={
         'fast sparse matrix cholesky factorization': ['scikit-sparse']
