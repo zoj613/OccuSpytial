@@ -70,7 +70,6 @@ class MCMCModelBase(ABC):
         # array to store prob updates for sites where species is not obversed
         self._probs = np.zeros(self.not_obs.size, dtype=np.float64)
         # array to store occupancy prob for sites where species is unsurveyed
-        self._s_probs = np.zeros(self._s, dtype=np.float64)
         self._us_probs = np.zeros(self._us, dtype=np.float64)
         # stacked W matrix for all sites where species is not observed
         self._W_ = CustomDict(self.W).slice(self.not_obs)
