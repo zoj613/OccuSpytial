@@ -21,7 +21,26 @@ ArgsType = Tuple[
 
 
 class Sampler:
-    """A class to perform all the inference for the ICAR and RSR models
+    """A class to perform all the inference for the ICAR and RSR models.
+
+    Args:
+        X (np.ndarray): Design matrix of the occupancy process.
+        W (Dict[int, np.ndarray]): Design matrices of the detection
+            detection process.
+        y (Dict[int, np.ndarray]): Contains the detection and non-
+            detection data for a species.
+        Q (np.ndarray): The spatial precision matrix.
+        init (ParamType): The initial values of model parameters.
+        hypers (ParamType): The hyperparameters of the model.
+        model (str, optional): The model name. Defaults to 'icar'.
+        chains (int, optional): The number of chains to use while
+            sampling. Defaults to 2.
+        threshold (float, optional): The spatial autocorrelation
+            parameter associated with choosing the size of the RSR
+            model. Defaults to 0..
+
+    Raises:
+        Exception: If unsupported model name is used as input.
 
     Attributes:
         mode (str): The model name.
@@ -52,26 +71,7 @@ class Sampler:
             chains: int = 2,
             threshold: float = 0.
     ) -> None:
-        """
-        Args:
-            X (np.ndarray): Design matrix of the occupancy process.
-            W (Dict[int, np.ndarray]): Design matrices of the detection
-                detection process.
-            y (Dict[int, np.ndarray]): Contains the detection and non-
-                detection data for a species.
-            Q (np.ndarray): The spatial precision matrix.
-            init (ParamType): The initial values of model parameters.
-            hypers (ParamType): The hyperparameters of the model.
-            model (str, optional): The model name. Defaults to 'icar'.
-            chains (int, optional): The number of chains to use while
-                sampling. Defaults to 2.
-            threshold (float, optional): The spatial autocorrelation
-                parameter associated with choosing the size of the RSR
-                model. Defaults to 0..
 
-        Raises:
-            Exception: If unsupported model name is used as input.
-        """
         self.mode = model
         self.n_chains = chains
         self.inits = [init]

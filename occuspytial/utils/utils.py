@@ -42,6 +42,9 @@ logger = logging.getLogger(__name__)
 class ProgressBar:
     """A class to emulate a progress bar on the terminal
 
+    Args:
+        n (int): Total number of iterations.
+
     Attributes:
         BAR_LENGTH (int): The horizontal length of the progress bar.
         _FILE (io.TextIOWrapper): A file object.
@@ -58,10 +61,7 @@ class ProgressBar:
     BAR_LENGTH = 25
 
     def __init__(self, n: int) -> None:
-        """
-        Args:
-            n (int): Total number of iterations.
-        """
+
         if sys.stdout.isatty():  # check if script is running from console
             self._FILE = open(sys.stdout.fileno(), mode='w', encoding='utf8')
             fill = "█"
@@ -212,7 +212,10 @@ class CustomDict(dict):
 
 class SpatialStructure:
     """ A class intended for generating spatial precision matrix used in
-    models like CAR, ICAR and RSR
+    models like CAR, ICAR and RSR.
+
+    Args:
+        n (int): The number of sites.
 
     Attributes:
         n (int): The number of sites.
@@ -223,10 +226,7 @@ class SpatialStructure:
     """
 
     def __init__(self, n: int) -> None:
-        """
-        Args:
-            n (int): The number of sites.
-        """
+
         self.n = n
 
     def _generate_random_lattice(
