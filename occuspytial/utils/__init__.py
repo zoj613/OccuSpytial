@@ -3,7 +3,8 @@ from .utils import (
     ProgressBar,
     affine_sample,
     acf,
-    CustomDict
+    CustomDict,
+    log_config
 )
 from .basemodel import MCMCModelBase
 
@@ -13,5 +14,6 @@ __all__ = [
     "affine_sample",
     "acf",
     "CustomDict",
-    "MCMCModelBase"
+    "MCMCModelBase",
+    "log_config"
 ]

@@ -1,3 +1,4 @@
+import logging
 from typing import Callable, Dict, Optional
 
 import numpy as np  # type: ignore
@@ -12,6 +13,7 @@ from .helpers.ctypesfunc import num_prod
 from ..utils.utils import affine_sample, CustomDict, ProgressBar
 from ..utils.basemodel import MCMCModelBase, ParamType
 
+logger = logging.getLogger(__name__)
 pg = PyPolyaGamma()
 
 
@@ -32,7 +34,10 @@ class ICAR(MCMCModelBase):
         super().__init__(X, W, y, init, hypers)
         rank = np.linalg.matrix_rank(Q)
         self.Q = csc_matrix(Q)
-        assert rank < self._n, "Q must be singular"
+        if rank >= self._n:
+            _msg = "Q must be a singular matrix. Cannot continue."
+            logger.error(_msg)
+            raise Exception(_msg)
         self._k = self._z - 0.5  # initial value of k = z - 0.5*1
         self._Wc = None
         self._kc = None
@@ -61,11 +66,16 @@ class ICAR(MCMCModelBase):
             # than the specified threshold
             w, v = eigh(omega, overwrite_a=True, check_finite=False)
             w, v = w[::-1], np.fliplr(v)  # order eigens in descending order
-            _msg = "threshold value needs to be between 0 and 1 (incl.)"
-            assert threshold >= 0 and threshold <= 1, _msg
+            _msg = "threshold value needs to be between 0 and 1 (inclusive)"
+            if not 0 <= threshold <= 1:
+                logger.error(_msg)
+                raise Exception(_msg)
             q = len(w[w >= threshold])  # number of eigenvalues > threshold
-            assert q > 0, "Threshold is set too high. Please lower it."
-            print("dimension reduced from {0}->{1}".format(Q.shape[0], q))
+            _msg = "Threshold is set too high. Please lower it."
+            if not q > 0:
+                logger.error(_msg)
+                raise Exception(_msg)
+            logger.info("dimension reduced: {0}->{1}".format(Q.shape[0], q))
             self._K = v[:, :q]  # keep first q eigenvectors of ordered eigens
             self.Minv = self._K.T @ Q @ self._K
             self._Ks = self._K[:self._s]  # K sub-matrix for surveyed sites
@@ -75,6 +85,9 @@ class ICAR(MCMCModelBase):
             try:
                 self._theta = init["theta"]
             except KeyError:
+                logger.warning(
+                    "theta parameter was not supplied. Generating it randomly"
+                )
                 self._theta = np.random.normal(0, 1, q)
 
     def _omega_a_update(self) -> None:
@@ -110,15 +123,15 @@ class ICAR(MCMCModelBase):
         try:
             rhs = np.column_stack((s, self._ones))
             xz = sp_chol_factor.solve_A(rhs)
-
+            logger.debug("updated eta using scikit-sparse routines.")
         except AttributeError:
 
             xz = splu(
                 prec,
                 permc_spec='MMD_AT_PLUS_A',
                 options=dict(SymmetricMode=True)
-            ).solve(np.column_stack((s, self._ones)))
-
+            ).solve(rhs)
+            logger.debug("updated eta using scipy routines.")
         finally:
             a = xz.sum(axis=0)
             a = -a[0] / a[1]
@@ -210,7 +223,6 @@ class ICAR(MCMCModelBase):
         else:
             occ = expit(self.X[self.not_obs] @ self._beta + vec[self.not_obs])
 
-        self._s_probs = occ
         omd = 1 / (1 + np.exp(self._W_ @ self._alpha))
         # calculate the numerator product for each site i
         # in the expression for the probability of z=1 | y=0
@@ -288,6 +300,10 @@ class ICAR(MCMCModelBase):
             try:
                 self._theta = init["theta"]
             except KeyError:
+                logger.info(
+                    "automatically generating initial values for theta since"
+                    " they were not supplied to the model."
+                )
                 self._theta = np.random.normal(0, 1, self.Minv.shape[0])
 
     def run_sampler(
@@ -300,15 +316,21 @@ class ICAR(MCMCModelBase):
     ) -> None:
 
         if init is not None:
+            logger.info("supplying model with parameter initial values.")
             self._new_init(init)
 
         if burnin is None:
+            logger.debug("burnin value not set, using the default value.")
             burnin = int(0.5 * iters)  # default burnin value
 
         post_burnin: int = iters - burnin
-        assert post_burnin > 0, "iters needs to be larger than burnin."
+        if post_burnin <= 0:
+            _msg = "iters needs to be larger than burnin. Sampling failed."
+            logger.error(_msg)
+            raise ValueError(_msg)
 
         if progressbar:
+            logger.debug("turning on progress bar...")
             bar = ProgressBar(iters)
 
         setattr(self, '_traces', np.empty((post_burnin, len(self._names))))
@@ -320,6 +342,7 @@ class ICAR(MCMCModelBase):
             )
 
         j = 0
+        logger.debug("beginning the first iteration...")
         for i in range(iters):
             self._params_update(nonspatial)
             if progressbar:
@@ -335,6 +358,6 @@ class ICAR(MCMCModelBase):
                     if not nonspatial:
                         self.theta_mat[j] = self._theta
                 except AttributeError:
-                    pass
+                    logger.debug("RSR model is not in use currently.")
 
                 j += 1
