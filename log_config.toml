@@ -41,16 +41,15 @@ version = 1
 
   [loggers.interface]
   handlers = ["console", "error_file_handler"]
-  level = "DEBUG"
+  level = "WARNING"
   propagate = false
 
   [loggers.model]
-  handlers = [
-    "console", "error_file_handler", "info_file_handler"]
-  level = "DEBUG"
+  handlers = ["console", "error_file_handler", "info_file_handler"]
+  level = "WARNING"
   propagate = false
 
 [root]
 handlers = ["console", "error_file_handler", "info_file_handler"]
 formatter = "simple"
-level = "DEBUG"
+level = "INFO"
