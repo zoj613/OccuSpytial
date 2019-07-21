@@ -1,9 +1,9 @@
-from multiprocessing import cpu_count
+from multiprocessing import Pool
+import logging
 from typing import Dict, Optional, Tuple, Union
 from warnings import simplefilter
 
 from beautifultable import BeautifulTable
-from loky import get_reusable_executor
 import matplotlib.pyplot as plt
 import numpy as np  # type: ignore
 from scipy.signal import welch as specdensity
@@ -12,6 +12,7 @@ from scipy.stats import gaussian_kde
 from .icar.model import ICAR, ParamType
 from .utils.utils import acf
 
+logger = logging.getLogger(__name__)
 simplefilter('ignore', UserWarning)
 plt.style.use('ggplot')
 ArgsType = Tuple[
@@ -82,6 +83,7 @@ class Sampler:
                 X, W, y, Q, init, hypers, use_rsr=True, threshold=threshold
             )
         else:
+            logger.error(f"wrong model choice. {model} is not supported.")
             raise Exception("model choice can only be 'icar' or 'rsr'")
         self._names = self.model._names
         self.fullchain = np.array(self._names, ndmin=2)
@@ -105,7 +107,7 @@ class Sampler:
                 _init[key] = value
             self.inits.append(_init)
 
-    def _get_samples(self, args: ArgsType) -> Tuple[np.ndarray, np.ndarray]:
+    def __call__(self, args: ArgsType) -> Tuple[np.ndarray, np.ndarray]:
         model, iters, burnin, init, progressbar, nonspat = args
         model.run_sampler(iters, burnin, init, progressbar, nonspat)
         return model._traces, model.z_mat.mean(axis=0)
@@ -138,9 +140,8 @@ class Sampler:
                 the model version without the spatial part included.
                 Defaults to False.
         """
-        executor = get_reusable_executor(max_workers=cpu_count())
-
         if new_init is not None:
+            logger.debug("setting parameter initial values")
             self._new_inits(new_init)
         setattr(self, 'nonspat', nonspatial)
 
@@ -149,11 +150,13 @@ class Sampler:
             for init
             in self.inits
         ]
-        results = executor.map(self._get_samples, args)
-        for chain, avg_occ in list(results):
-            self.fullchain = np.concatenate((self.fullchain, chain))
-            self.occ_probs += avg_occ
-
+        logger.debug("distributing the sampler among workers...")
+        with Pool() as pool:
+            logger.debug(f"Pool currently using {pool._processes} processes.")
+            for chain, avg_occ in pool.map(self, args):
+                self.fullchain = np.concatenate((self.fullchain, chain))
+                self.occ_probs += avg_occ
+        logger.info("sampling completed successfully.")
         self.occ_probs /= self.n_chains
 
     def trace_plots(
@@ -278,6 +281,7 @@ class Sampler:
             try:
                 s = np.split(chains, self.n_chains, axis=0)
             except ValueError as ve:
+                logger.exception("Unequal chain lengths.")
                 raise Exception("Chains need to be of equal length.") from ve
             m = self.n_chains  # number of chains
             n = s[0].shape[0]  # length of each chain
@@ -321,7 +325,10 @@ class Sampler:
         Returns:
             np.ndarray: Test values for each parameter.
         """
-        assert first + last <= 1, "first + last should not exceed 1"
+        if first + last > 1:
+            _msg = "first + last should not exceed 1"
+            logger.error(_msg)
+            raise ValueError(_msg)
         x1 = chain[:int(first * chain.shape[0])]
         x2 = chain[int((1 - last) * chain.shape[0]):]
         n1 = x1.shape[0]
