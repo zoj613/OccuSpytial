@@ -324,7 +324,7 @@ class SpatialStructure:
                 neighbor_indx = self._neighbor_indx(indx, n_type)
 
             for row, col in neighbor_indx:
-                neighbor_site = self.lattice[row, col]
+                neighbor_site = self.lattice[row - 1, col - 1]
                 a[site - 1, neighbor_site - 1] = 1
                 a[neighbor_site - 1, site - 1] = 1
 
