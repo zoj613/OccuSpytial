@@ -6,6 +6,7 @@ from pathlib import Path
 import sys
 import time
 from typing import Any, List, Optional, Sequence, Tuple, Union
+import warnings
 
 import numpy as np  # type: ignore
 from numpy.random import standard_normal as std_norm
@@ -13,9 +14,27 @@ from scipy.linalg import cholesky as chol
 from scipy.sparse import csc_matrix, issparse
 try:
     from sksparse.cholmod import Factor, cholesky as sp_chol
+    FactorObject = Factor
+except ImportError:
+    warnings.showwarning(
+        "scikit sparse is not installed. Inference may be slow. "
+        "To ensure maximum speed during inference, please install the "
+        "sckit-sparse package.",
+        category=ImportWarning,
+        filename=__name__,
+        lineno=16
+    )
+    FactorObject = None
+try:
     import toml
 except ImportError:
-    pass
+    warnings.showwarning(
+        "The toml package is not installed. Logging configuration through "
+        "the toml config file can not be used until it is installed.",
+        category=ImportWarning,
+        filename=__name__,
+        lineno=29
+    )
 
 logger = logging.getLogger(__name__)
 
@@ -98,7 +117,7 @@ def affine_sample(
         mean: np.ndarray,
         cov: Union[csc_matrix, np.ndarray],
         return_factor: bool = False
-) -> Union[Tuple[np.ndarray, Factor], np.ndarray]:
+) -> Union[Tuple[np.ndarray, FactorObject], np.ndarray]:
     """Sample from a multivariate normal distribution that has a sparse
     covariance matrix using Affine transformation / "reparameterization
     trick".
