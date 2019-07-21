@@ -3,6 +3,11 @@ OccuSpytial
 
 A package for fast bayesian analysis of spatial occupancy models. OccuSpytial implements an efficient Gibbs Sampler for the single season site spatial occupancy model using the Intrinsic Conditional Autoregressive (ICAR) model for spatial random effects. The Gibbs sampler is made possible by using Polya-Gamma data-augmentation to obtain closed form expressions for the full conditional distributions of the parameters of interest when using the logit link function to model the occupancy and detection probabilities. Multiple chains of the Gibbs sampler are ran in parallel.
 
+References
+----------
+For more information regarding this implementation please refer to the following paper:
+Clark AE, Altwegg R. Efficient Bayesian analysis of occupancy models with logit link functions. Ecol Evol. 2019;9:756–768.
+
 Installation
 ------------
 currently this package can be installed by downloading the repository and running the following command on the folder with the package:
