@@ -411,3 +411,7 @@ def log_config(
             )
     else:
         logging.basicConfig(level=default_level)
+        logging.error(
+            "The specified log config file path does not exist. "
+            "Basic logging config will be used instead."
+        )
