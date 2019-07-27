@@ -17,6 +17,57 @@ logger = logging.getLogger(__name__)
 pg = PyPolyaGamma()
 
 
+class RSR:
+
+    def __init__(
+        self,
+        X: np.ndarray,
+        Q: csc_matrix, 
+        init: ParamType,
+        hypers: ParamType,
+        threshold: float,
+        num_of_surveyed_sites: int 
+    ) -> None:
+
+        n = X.shape[0]
+        XTX_i = inv(X.T @ X, overwrite_a=True, check_finite=False)
+        P = -multi_dot([X, XTX_i, X.T])
+        P[np.diag_indices(n)] += 1
+        # above 2 lines equivalent to: I - X @ XTX @ XT
+        A = Q.copy()
+        A.data = -A.data
+        A.setdiag(np.zeros(n))
+        omega = n * (P @ A @ P) / A.sum()
+        # return eigen vectors of omega and keep first q columns
+        # corresponding to the q largest eigenvalues of omega greater
+        # than the specified threshold
+        w, v = eigh(omega, overwrite_a=True, check_finite=False)
+        w, v = w[::-1], np.fliplr(v)  # order eigens in descending order
+        _msg = "threshold value needs to be between 0 and 1 (inclusive)"
+        if not 0 <= threshold <= 1:
+            logger.error(_msg)
+            raise Exception(_msg)
+        q = len(w[w >= threshold])  # number of eigenvalues > threshold
+        _msg = "Threshold is set too high. Please lower it."
+        if not q > 0:
+            logger.error(_msg)
+            raise Exception(_msg)
+        logger.info("dimension reduced: {0}->{1}".format(n, q))
+        self._K = v[:, :q]  # keep first q eigenvectors of ordered eigens
+        self.Minv = self._K.T @ Q @ self._K
+        self._Ks = self._K[:num_of_surveyed_sites]
+        self.Q = self.Minv  # replace Q with Minv in the underlying ICAR
+        self._shape = hypers["i_1"] + 0.5 * q
+        # theta initial values
+        try:
+            self._theta = init["theta"]
+        except KeyError:
+            logger.warning(
+                "theta parameter was not supplied. Generating it randomly"
+            )
+            self._theta = np.random.normal(0, 1, q)
+
+
 class ICAR(MCMCModelBase):
 
     def __init__(
@@ -48,47 +99,13 @@ class ICAR(MCMCModelBase):
         self._omega_b = np.empty(self._n)
         self._ones = np.ones_like(self._omega_b)
         self._use_rsr = use_rsr
-        if not use_rsr:
+        if use_rsr:
+            # RSR model specific attributes
+            rsr = RSR(X, self.Q, init, hypers, threshold, self._s)
+            self.__dict__.update(rsr.__dict__)
+        else:
             # ICAR model specific attributes
             self._eta = self.init["eta"]
-        else:
-            # RSR model specific attributes
-            XTX_i = inv(X.T @ X, overwrite_a=True, check_finite=False)
-            P = -multi_dot([X, XTX_i, X.T])
-            P[np.diag_indices(self._n)] += 1
-            # above 2 lines equivalent to: I - X @ XTX @ XT
-            A = self.Q
-            A.data = -A.data
-            A.setdiag(np.zeros(self._n))
-            omega = self._n * (P @ A @ P) / A.sum()
-            # return eigen vectors of omega and keep first q columns
-            # corresponding to the q largest eigenvalues of omega greater
-            # than the specified threshold
-            w, v = eigh(omega, overwrite_a=True, check_finite=False)
-            w, v = w[::-1], np.fliplr(v)  # order eigens in descending order
-            _msg = "threshold value needs to be between 0 and 1 (inclusive)"
-            if not 0 <= threshold <= 1:
-                logger.error(_msg)
-                raise Exception(_msg)
-            q = len(w[w >= threshold])  # number of eigenvalues > threshold
-            _msg = "Threshold is set too high. Please lower it."
-            if not q > 0:
-                logger.error(_msg)
-                raise Exception(_msg)
-            logger.info("dimension reduced: {0}->{1}".format(Q.shape[0], q))
-            self._K = v[:, :q]  # keep first q eigenvectors of ordered eigens
-            self.Minv = self._K.T @ Q @ self._K
-            self._Ks = self._K[:self._s]  # K sub-matrix for surveyed sites
-            self.Q = self.Minv  # replace Q with Minv in the underlying ICAR
-            self._shape = hypers["i_1"] + 0.5 * q
-            # theta initial values
-            try:
-                self._theta = init["theta"]
-            except KeyError:
-                logger.warning(
-                    "theta parameter was not supplied. Generating it randomly"
-                )
-                self._theta = np.random.normal(0, 1, q)
 
     def _omega_a_update(self) -> None:
 
