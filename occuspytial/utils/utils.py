@@ -307,15 +307,20 @@ class SpatialStructure:
         edge_case = (
             indx[0] == 0  # current site is in first row of lattice
             or indx[1] == 0  # is in first column of lattice
-            or indx[0] == (self.n - 1)  # is in last row of lattice
-            or indx[1] == (self.n - 1)  # is in last column of lattice
+            or indx[0] == self.lattice.shape[0] - 1  # is in last row
+            or indx[1] == self.lattice.shape[1] - 1  # is in last column
         )
         if edge_case:
             logger.debug(f"site index {indx} is an edge case")
             for item in np.array(out):
-                if np.any(item < 0) or np.any(item >= self.n):
+                if (
+                    np.any(item < 0)
+                    or item[0] >= self.lattice.shape[0]
+                    or item[1] >= self.lattice.shape[1]
+                ):
                     out.remove(tuple(item))
                     logger.debug(f"removed {item} as a neighbor of {indx}")
+            logger.debug(f"index neighbor list is: {out}")
         return out
 
     def _adjacency_matrix(self, n_type: int = 48) -> None:
@@ -343,7 +348,7 @@ class SpatialStructure:
                 neighbor_indx = self._neighbor_indx(indx, n_type)
 
             for row, col in neighbor_indx:
-                neighbor_site = self.lattice[row - 1, col - 1]
+                neighbor_site = self.lattice[row, col]
                 a[site - 1, neighbor_site - 1] = 1
                 a[neighbor_site - 1, site - 1] = 1
 
