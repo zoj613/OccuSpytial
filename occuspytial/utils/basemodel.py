@@ -1,11 +1,33 @@
 from abc import ABC, abstractmethod
-from typing import Dict, List, Union
+from typing import Dict, List, Optional, Tuple, Union
 
 import numpy as np
 
 from .utils import CustomDict
 
 ParamType = Dict[str, Union[np.ndarray, float]]
+
+
+def _set_param_values(X, W, hypers, inits) -> Tuple[ParamType, ParamType]:
+    """Set default parameter values if none are provided by the user"""
+    hyper_out = {}
+    init_out = {}
+    p = X.shape[1]
+    p_v = W[0].shape[1]
+    n = X.shape[0]
+    hyper_out["a_mu"] = hypers.get("a_mu", np.zeros(p_v))
+    hyper_out["a_prec"] = hypers.get("a_prec", np.diag([1. / 1000] * p_v))
+    hyper_out["b_mu"] = hypers.get("b_mu", np.zeros(p))
+    hyper_out["b_prec"] = hypers.get("b_prec", np.diag([1. / 1000] * p))
+    hyper_out["shape"] = hypers.get("shape", 0.5)
+    hyper_out["rate"] = hypers.get("rate", 0.0005)
+
+    init_out["alpha"] = inits.get("alpha", np.zeros_like(hyper_out["a_mu"]))
+    init_out["beta"] = inits.get("beta", np.zeros_like(hyper_out["b_mu"]))
+    init_out["tau"] = inits.get("tau", 10)
+    init_out["eta"] = inits.get("eta", np.random.uniform(-10, 10, size=n))
+
+    return hyper_out, init_out
 
 
 class MCMCModelBase(ABC):
@@ -42,8 +64,8 @@ class MCMCModelBase(ABC):
             X: np.ndarray,
             W: Dict[int, np.ndarray],
             y: Dict[int, np.ndarray],
-            init: ParamType,
-            hypers: ParamType
+            init: Optional[ParamType] = {},
+            hypers: Optional[ParamType] = {}
     ) -> None:
 
         self.W = W
@@ -57,20 +79,20 @@ class MCMCModelBase(ABC):
             [self.W[i].shape[0] for i in range(self._s)],
             dtype=np.int64
         )
-        self.init = init
-        self.hypers = hypers
+        self.hypers, self.init = _set_param_values(X, W, hypers, init)
+
         self._not_obs: List[int] = []  # surveyed sites where not observed
         # initialize z, the site occupancy state
-        self._z = np.ones(self._n, dtype=np.int64)
+        self._z = np.ones(self._n, dtype=int)
         for i in range(self._s):
             if not any(self.y[i]):
                 self._not_obs.append(i)
-                self._z[i] = 0.0
-        self.not_obs: np.ndarray = np.array(self._not_obs, dtype=np.int64)
+                self._z[i] = 0
+        self.not_obs: np.ndarray = np.array(self._not_obs, dtype=int)
         # array to store prob updates for sites where species is not obversed
-        self._probs = np.zeros(self.not_obs.size, dtype=np.float64)
+        self._probs = np.zeros(self.not_obs.size, dtype=float)
         # array to store occupancy prob for sites where species is unsurveyed
-        self._us_probs = np.zeros(self._us, dtype=np.float64)
+        self._us_probs = np.zeros(self._us, dtype=float)
         # stacked W matrix for all sites where species is not observed
         self._W_ = CustomDict(self.W).slice(self.not_obs)
         # store parameter names to be used in plot labels.
@@ -82,9 +104,9 @@ class MCMCModelBase(ABC):
         # specify the names of the posterior parameters
         self._names.append("PAO")
         self._names.append(r"$\tau$")
-        self._alpha = init["alpha"]  # inital values for alpha
-        self._beta = init["beta"]  # initial values for beta
-        self._tau = init["tau"]  # initial values for tau
+        self._alpha = self.init["alpha"]  # inital values for alpha
+        self._beta = self.init["beta"]  # initial values for beta
+        self._tau = self.init["tau"]  # initial values for tau
         self.avg_occ_probs = np.ones(self._n)
 
     @abstractmethod
