@@ -57,15 +57,9 @@ class RSR:
         self.Minv = self._K.T @ Q @ self._K
         self._Ks = self._K[:num_of_surveyed_sites]
         self.Q = self.Minv  # replace Q with Minv in the underlying ICAR
-        self._shape = hypers["i_1"] + 0.5 * q
+        self._shape = hypers["shape"] + 0.5 * q
         # theta initial values
-        try:
-            self._theta = init["theta"]
-        except KeyError:
-            logger.warning(
-                "theta parameter was not supplied. Generating it randomly"
-            )
-            self._theta = np.random.normal(0, 1, q)
+        self._theta = init.get("theta", np.random.normal(0, 1, q))
 
 
 class ICAR(MCMCModelBase):
@@ -93,7 +87,7 @@ class ICAR(MCMCModelBase):
         self._Wc = None
         self._kc = None
         # constant shape parameter for _tau_update method
-        self._shape = self.hypers["i_1"] + 0.5 * rank
+        self._shape = self.hypers["shape"] + 0.5 * rank
         # attributes specific to omega_b update method
         self._omega_a = None
         self._omega_b = np.empty(self._n)
@@ -101,7 +95,7 @@ class ICAR(MCMCModelBase):
         self._use_rsr = use_rsr
         if use_rsr:
             # RSR model specific attributes
-            rsr = RSR(X, self.Q, init, hypers, threshold, self._s)
+            rsr = RSR(X, self.Q, self.init, self.hypers, threshold, self._s)
             self.__dict__.update(rsr.__dict__)
         else:
             # ICAR model specific attributes
@@ -126,7 +120,7 @@ class ICAR(MCMCModelBase):
 
     def _tau_update(self, vec: np.ndarray) -> None:
 
-        rate = 0.5 * vec @ self.Q @ vec + self.hypers["i_2"]
+        rate = 0.5 * vec @ self.Q @ vec + self.hypers["rate"]
         self._tau = np.random.gamma(shape=self._shape, scale=1 / rate)
 
     def _eta_update(self) -> None:
@@ -137,22 +131,20 @@ class ICAR(MCMCModelBase):
         b = self._k - self._omega_b * (self.X @ self._beta)
         s, sp_chol_factor = affine_sample(b, prec, return_factor=True)
 
-        try:
-            rhs = np.column_stack((s, self._ones))
+        rhs = np.column_stack((s, self._ones))  # right-hand-side of Ax = b
+        if not isinstance(sp_chol_factor, np.ndarray):
             xz = sp_chol_factor.solve_A(rhs)
             logger.debug("updated eta using scikit-sparse routines.")
-        except AttributeError:
-
+        else:
             xz = splu(
                 prec,
                 permc_spec='MMD_AT_PLUS_A',
                 options=dict(SymmetricMode=True)
             ).solve(rhs)
             logger.debug("updated eta using scipy routines.")
-        finally:
-            a = xz.sum(axis=0)
-            a = -a[0] / a[1]
-            self._eta = xz[:, 0] + a * xz[:, 1]
+        a = xz.sum(axis=0)
+        a = -a[0] / a[1]
+        self._eta = xz[:, 0] + a * xz[:, 1]
 
     def _theta_update(self) -> None:
 
@@ -240,7 +232,7 @@ class ICAR(MCMCModelBase):
         else:
             occ = expit(self.X[self.not_obs] @ self._beta + vec[self.not_obs])
 
-        omd = 1 / (1 + np.exp(self._W_ @ self._alpha))
+        omd = expit(self._W_ @ -self._alpha)
         # calculate the numerator product for each site i
         # in the expression for the probability of z=1 | y=0
         # num_prod stores the product on the object self._probs.
@@ -301,38 +293,32 @@ class ICAR(MCMCModelBase):
         """ Function doc """
         if nonspat:
             self._update_func_nonspat()
+        elif self._use_rsr:
+            self._update_func(self._theta_update, self._K, self._theta)
         else:
-            try:
-                self._update_func(self._theta_update, self._K, self._theta)
-            except AttributeError:
-                self._update_func(self._eta_update, self._eta)
+            self._update_func(self._eta_update, self._eta)
 
     def _new_init(self, init: ParamType) -> None:
 
         self._alpha = init["alpha"]
         self._beta = init["beta"]
         self._tau = init["tau"]
-        self._eta = init["eta"]
         if self._use_rsr:
-            try:
-                self._theta = init["theta"]
-            except KeyError:
-                logger.info(
-                    "automatically generating initial values for theta since"
-                    " they were not supplied to the model."
-                )
-                self._theta = np.random.normal(0, 1, self.Minv.shape[0])
+            default_value = np.random.normal(0, 1, self.Minv.shape[0])
+            self._theta = init.get("theta", default_value)
+        else:
+            self._eta = init["eta"]
 
     def run_sampler(
             self,
             iters: int = 2000,
             burnin: Optional[int] = None,
-            init: Optional[ParamType] = None,
+            init: Optional[ParamType] = {},
             progressbar: bool = True,
             nonspatial: bool = False
     ) -> None:
 
-        if init is not None:
+        if init != {}:
             logger.info("supplying model with parameter initial values.")
             self._new_init(init)
 
@@ -370,11 +356,10 @@ class ICAR(MCMCModelBase):
                     self._beta,
                     np.array([self._z.mean(), self._tau])
                 ))
-                try:
-                    self.z_mat[j] = self._z
-                    if not nonspatial:
-                        self.theta_mat[j] = self._theta
-                except AttributeError:
-                    logger.debug("RSR model is not in use currently.")
+                self.z_mat[j] = self._z
+                if self._use_rsr and not nonspatial:
+                    self.theta_mat[j] = self._theta
 
                 j += 1
+        if progressbar:
+            bar._FILE.close()
