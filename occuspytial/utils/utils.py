@@ -135,30 +135,19 @@ def affine_sample(
             set to True. The Cholesky factor is stored efficiently as
             a sksparse.cholmod.Factor object.
     """
-    try:
+    if issparse(cov) and 'sp_chol' in globals().keys():
         factor = sp_chol(cov, mode="supernodal")
         chol_factor = factor.apply_Pt(factor.L())
         x = mean + chol_factor @ std_norm(mean.size)
-    # sp_chol failed to import and/or cov is dense:
-    except (NameError, AttributeError):
-
-        # convert the covariance into a dense matrix if it stored in
-        # a sparse format
-        logger.debug(
-            "Either scikit-sparse module is not in use or the covariance "
-            "matrix is a numpy array. We will use scipy routines to compute "
-            "its Cholesky factor."
-        )
+    else:
         cov_dense = cov.toarray() if issparse(cov) else cov
         factor = chol(cov_dense, check_finite=False).T
         x = mean + factor @ std_norm(mean.size)
 
-    finally:
-
-        if return_factor:
-            return x, factor
-        else:
-            return x
+    if return_factor:
+        return x, factor
+    else:
+        return x
 
 
 def acf(x: np.ndarray, lag: int = 0) -> float:
