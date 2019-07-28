@@ -65,8 +65,8 @@ class Sampler:
             W: Dict[int, np.ndarray],
             y: Dict[int, np.ndarray],
             Q: np.ndarray,
-            init: ParamType,
-            hypers: ParamType,
+            init: Optional[ParamType] = {},
+            hypers: Optional[ParamType] = {},
             model: str = 'icar',
             chains: int = 2,
             threshold: float = 0.
