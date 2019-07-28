@@ -74,8 +74,6 @@ class Sampler:
 
         self.mode = model
         self.n_chains = chains
-        self.inits = [init]
-        self._new_inits(init)  # set initial values for the additional chains
         if model.lower() == 'icar':
             self.model = ICAR(X, W, y, Q, init, hypers)
         elif model.lower() == 'rsr':
@@ -85,6 +83,8 @@ class Sampler:
         else:
             logger.error(f"wrong model choice. {model} is not supported.")
             raise Exception("model choice can only be 'icar' or 'rsr'")
+        # set initial values for the additional chains
+        self._new_inits(self.model.init)
         self._names = self.model._names
         self.fullchain = np.array(self._names, ndmin=2)
         self.occ_probs = np.zeros(self.model._n)
@@ -98,13 +98,13 @@ class Sampler:
             _init = {}
             for key, value in init.items():
                 if key == "alpha" or key == "beta":
-                    value += np.random.uniform(-2, 2, len(value))
+                    new_value = value + np.random.uniform(-2, 2, len(value))
                 elif key == "tau":
-                    value += np.random.uniform(0, 5)
+                    new_value = value + np.random.uniform(0, 5)
                 else:
-                    value += np.random.uniform(-2, 2, len(value))
+                    new_value = value + np.random.uniform(-2, 2, len(value))
 
-                _init[key] = value
+                _init[key] = new_value
             self.inits.append(_init)
 
     def __call__(self, args: ArgsType) -> Tuple[np.ndarray, np.ndarray]:
