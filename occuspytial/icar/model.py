@@ -131,20 +131,22 @@ class ICAR(MCMCModelBase):
         b = self._k - self._omega_b * (self.X @ self._beta)
         s, sp_chol_factor = affine_sample(b, prec, return_factor=True)
 
-        rhs = np.column_stack((s, self._ones))  # right-hand-side of Ax = b
-        if not isinstance(sp_chol_factor, np.ndarray):
+        try:
+            rhs = np.column_stack((s, self._ones))
             xz = sp_chol_factor.solve_A(rhs)
             logger.debug("updated eta using scikit-sparse routines.")
-        else:
+        except AttributeError:
+
             xz = splu(
                 prec,
                 permc_spec='MMD_AT_PLUS_A',
                 options=dict(SymmetricMode=True)
             ).solve(rhs)
             logger.debug("updated eta using scipy routines.")
-        a = xz.sum(axis=0)
-        a = -a[0] / a[1]
-        self._eta = xz[:, 0] + a * xz[:, 1]
+        finally:
+            a = xz.sum(axis=0)
+            a = -a[0] / a[1]
+            self._eta = xz[:, 0] + a * xz[:, 1]
 
     def _theta_update(self) -> None:
 
