@@ -136,7 +136,7 @@ def affine_sample(
             a sksparse.cholmod.Factor object.
     """
     if issparse(cov) and 'sp_chol' in globals().keys():
-        factor = sp_chol(cov, mode="supernodal")
+        factor = sp_chol(cov, ordering_method="metis")
         chol_factor = factor.apply_Pt(factor.L())
         x = mean + chol_factor @ std_norm(mean.size)
     else:
