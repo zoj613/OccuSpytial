@@ -2,12 +2,8 @@ import pytest
 import numpy as np
 from scipy.sparse import csc_matrix
 
-from occuspytial.utils.utils import (
-    acf,
-    affine_sample,
-    CustomDict,
-    SpatialStructure
-)
+from occuspytial.utils.misc import CustomDict, SpatialStructure
+from occuspytial.utils.stats import acf, affine_sample
 
 
 @pytest.fixture
