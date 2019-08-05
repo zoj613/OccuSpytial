@@ -79,7 +79,7 @@ def affine_sample(
         x = mean + chol_factor @ std_norm(mean.size)
     else:
         cov_dense = cov.toarray() if issparse(cov) else cov
-        factor = chol(cov_dense, check_finite=False)
+        factor = chol(cov_dense)
         x = mean + std_norm(mean.size) @ factor
 
     if return_factor:

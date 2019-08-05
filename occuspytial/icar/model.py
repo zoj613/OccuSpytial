@@ -157,19 +157,8 @@ class ICAR(MCMCModelBase):
         prec = self._tau * self.Minv + (self._Ks.T * omega) @ self._Ks
         b = self._Ks.T @ (k - omega * (self.Xs @ self._beta))
         prec_theta, upper_tri = affine_sample(b, prec, return_factor=True)
-        x = tri_solve(
-            upper_tri,
-            prec_theta,
-            trans=1,
-            overwrite_b=True,
-            check_finite=False
-        )
-        self._theta = tri_solve(
-            upper_tri,
-            x,
-            overwrite_b=True,
-            check_finite=False
-        )
+        x = tri_solve(upper_tri, prec_theta, trans=1)
+        self._theta = tri_solve(upper_tri, x)
 
     def _wk_update(self) -> None:
 
@@ -183,19 +172,8 @@ class ICAR(MCMCModelBase):
         prec = (self._Wc * self._omega_a) @ self._Wc.T + a_prec
         b = a_prec @ a_mu + self._Wc @ self._kc
         prec_alpha, upper_tri = affine_sample(b, prec, return_factor=True)
-        x = tri_solve(
-            upper_tri,
-            prec_alpha,
-            trans=1,
-            overwrite_b=True,
-            check_finite=False
-        )
-        self._alpha = tri_solve(
-            upper_tri,
-            x,
-            overwrite_b=True,
-            check_finite=False
-        )
+        x = tri_solve(upper_tri, prec_alpha, trans=1)
+        self._alpha = tri_solve(upper_tri, x)
 
     def _beta_update(self, vec: np.ndarray, nonspat: bool = False) -> None:
 
@@ -209,19 +187,8 @@ class ICAR(MCMCModelBase):
             vec = vec[:self._s]
             b = self.Xs.T @ (k - omega * vec) + b_prec @ b_mu
         prec_beta, upper_tri = affine_sample(b, prec, return_factor=True)
-        x = tri_solve(
-            upper_tri,
-            prec_beta,
-            trans=1,
-            overwrite_b=True,
-            check_finite=False
-        )
-        self._beta = tri_solve(
-            upper_tri,
-            x,
-            overwrite_b=True,
-            check_finite=False
-        )
+        x = tri_solve(upper_tri, prec_beta, trans=1)
+        self._beta = tri_solve(upper_tri, x)
 
     def _z_update(self, vec: np.ndarray, nonspat: bool = False) -> None:
 
