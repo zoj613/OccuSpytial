@@ -3,7 +3,7 @@ from typing import Dict, List, Optional, Tuple, Union
 
 import numpy as np
 
-from .utils import CustomDict
+from occuspytial.utils.misc import CustomDict
 
 ParamType = Dict[str, Union[np.ndarray, float]]
 
