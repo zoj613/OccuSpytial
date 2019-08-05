@@ -49,6 +49,16 @@ version = 1
   level = "WARNING"
   propagate = false
 
+  [loggers.misc]
+  handlers = ["console", "error_file_handler", "info_file_handler"]
+  level = "WARNING"
+  propagate = false
+
+  [loggers.stats]
+  handlers = ["error_file_handler", "info_file_handler"]
+  level = "WARNING"
+  propagate = false
+
 [root]
 handlers = ["console", "error_file_handler", "info_file_handler"]
 formatter = "simple"
