@@ -4,13 +4,13 @@ import warnings
 
 from beautifultable import BeautifulTable
 import numpy as np
-from scipy.signal import welch as specdensity
-from numpy.random import standard_normal as std_norm
-from scipy.linalg import cholesky as chol
+from scipy.signal import welch as spectral_density
+from numpy.random import standard_normal
+from scipy.linalg import cholesky
 from scipy.sparse import csc_matrix, issparse
 
 try:
-    from sksparse.cholmod import Factor, cholesky as sp_chol
+    from sksparse.cholmod import Factor, cholesky as sparse_cholesky
     FactorObject = Factor
 except ImportError:
     warnings.showwarning(
@@ -73,14 +73,14 @@ def affine_sample(
             set to True. The Cholesky factor is stored efficiently as
             a sksparse.cholmod.Factor object.
     """
-    if issparse(cov) and 'sp_chol' in globals().keys():
-        factor = sp_chol(cov, ordering_method="metis")
+    if issparse(cov) and 'sparse_cholesky' in globals().keys():
+        factor = sparse_cholesky(cov, ordering_method="metis")
         chol_factor = factor.apply_Pt(factor.L())
-        x = mean + chol_factor @ std_norm(mean.size)
+        x = mean + chol_factor @ standard_normal(mean.size)
     else:
         cov_dense = cov.toarray() if issparse(cov) else cov
-        factor = chol(cov_dense)
-        x = mean + std_norm(mean.size) @ factor
+        factor = cholesky(cov_dense)
+        x = mean + standard_normal(mean.size) @ factor
 
     if return_factor:
         return x, factor
@@ -177,8 +177,8 @@ class ConvergenceDiagnostics:
         s2 = s1
 
         for i in range(num_of_params):
-            s1[i] = specdensity(x1[:, i])[1][0]
-            s2[i] = specdensity(x2[:, i])[1][0]
+            s1[i] = spectral_density(x1[:, i])[1][0]
+            s2[i] = spectral_density(x2[:, i])[1][0]
 
         return (x1mean - x2mean) / np.sqrt(s1 / n1 + s2 / n2)
 
