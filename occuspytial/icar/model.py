@@ -3,7 +3,7 @@ from typing import Callable, Dict, Optional
 
 import numpy as np  # type: ignore
 from numpy.linalg import multi_dot
-from scipy.linalg import eigh, inv, solve_triangular as tri_solve, solve
+from scipy.linalg import eigh, inv, solve_triangular as tri_solve
 from scipy.sparse import csc_matrix
 from scipy.sparse.linalg import splu
 from scipy.special import expit  # inverse logit
@@ -24,7 +24,7 @@ class RSR:
     def __init__(
         self,
         X: np.ndarray,
-        Q: csc_matrix, 
+        Q: csc_matrix,
         init: ParamType,
         hypers: ParamType,
         threshold: float,
