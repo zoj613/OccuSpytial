@@ -3,15 +3,17 @@ from typing import Callable, Dict, Optional
 
 import numpy as np  # type: ignore
 from numpy.linalg import multi_dot
-from scipy.linalg import eigh, inv, solve_triangular as tri_solve
+from scipy.linalg import eigh, inv, solve_triangular as tri_solve, solve
 from scipy.sparse import csc_matrix
 from scipy.sparse.linalg import splu
 from scipy.special import expit  # inverse logit
 from pypolyagamma import PyPolyaGamma
 
-from .helpers.ctypesfunc import num_prod
-from ..utils.utils import affine_sample, CustomDict, ProgressBar
-from ..utils.basemodel import MCMCModelBase, ParamType
+from occuspytial.icar.helpers.ctypesfunc import num_prod
+from occuspytial.utils.misc import CustomDict
+from occuspytial.utils.basemodel import MCMCModelBase, ParamType
+from occuspytial.utils.stats import affine_sample
+from occuspytial.utils.visualization import ProgressBar
 
 logger = logging.getLogger(__name__)
 pg = PyPolyaGamma()
@@ -26,7 +28,7 @@ class RSR:
         init: ParamType,
         hypers: ParamType,
         threshold: float,
-        num_of_surveyed_sites: int 
+        num_of_surveyed_sites: int
     ) -> None:
 
         n = X.shape[0]
@@ -154,19 +156,17 @@ class ICAR(MCMCModelBase):
         omega = self._omega_b[:self._s]
         prec = self._tau * self.Minv + (self._Ks.T * omega) @ self._Ks
         b = self._Ks.T @ (k - omega * (self.Xs @ self._beta))
-        prec_theta, lower_tri = affine_sample(b, prec, return_factor=True)
+        prec_theta, upper_tri = affine_sample(b, prec, return_factor=True)
         x = tri_solve(
-            lower_tri,
+            upper_tri,
             prec_theta,
-            lower=True,
+            trans=1,
             overwrite_b=True,
             check_finite=False
         )
         self._theta = tri_solve(
-            lower_tri,
+            upper_tri,
             x,
-            trans=1,
-            lower=True,
             overwrite_b=True,
             check_finite=False
         )
@@ -182,19 +182,17 @@ class ICAR(MCMCModelBase):
         a_mu, a_prec = self.hypers["a_mu"], self.hypers["a_prec"]
         prec = (self._Wc * self._omega_a) @ self._Wc.T + a_prec
         b = a_prec @ a_mu + self._Wc @ self._kc
-        prec_alpha, lower_tri = affine_sample(b, prec, return_factor=True)
+        prec_alpha, upper_tri = affine_sample(b, prec, return_factor=True)
         x = tri_solve(
-            lower_tri,
+            upper_tri,
             prec_alpha,
-            lower=True,
+            trans=1,
             overwrite_b=True,
             check_finite=False
         )
         self._alpha = tri_solve(
-            lower_tri,
+            upper_tri,
             x,
-            trans=1,
-            lower=True,
             overwrite_b=True,
             check_finite=False
         )
@@ -210,19 +208,17 @@ class ICAR(MCMCModelBase):
         else:
             vec = vec[:self._s]
             b = self.Xs.T @ (k - omega * vec) + b_prec @ b_mu
-        prec_beta, lower_tri = affine_sample(b, prec, return_factor=True)
+        prec_beta, upper_tri = affine_sample(b, prec, return_factor=True)
         x = tri_solve(
-            lower_tri,
+            upper_tri,
             prec_beta,
-            lower=True,
+            trans=1,
             overwrite_b=True,
             check_finite=False
         )
         self._beta = tri_solve(
-            lower_tri,
+            upper_tri,
             x,
-            trans=1,
-            lower=True,
             overwrite_b=True,
             check_finite=False
         )
