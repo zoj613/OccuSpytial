@@ -112,7 +112,8 @@ class Sampler(ConvergenceDiagnostics, Plots):
             burnin: Optional[int] = None,
             new_init: Optional[ParamType] = None,
             progressbar: bool = True,
-            nonspatial: bool = False
+            nonspatial: bool = False,
+            regularize: Optional[float] = None
     ) -> None:
         """Perform the sampling of posterior parameters of the model.
         Sampling ia done in parallel for each of the number of chains
@@ -137,6 +138,10 @@ class Sampler(ConvergenceDiagnostics, Plots):
         if new_init is not None:
             logger.debug("setting parameter initial values")
             self._new_inits(new_init)
+
+        if regularize is not None and self.model.__class__.__name__ == 'ICAR':
+            self.model.regularize = regularize
+
         setattr(self, 'nonspat', nonspatial)
 
         args = [

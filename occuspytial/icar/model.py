@@ -75,7 +75,8 @@ class ICAR(MCMCModelBase):
             init: ParamType,
             hypers: ParamType,
             use_rsr: bool = False,
-            threshold: float = 0.5
+            threshold: float = 0.5,
+            regularize: Optional[float] = None
     ) -> None:
 
         super().__init__(X, W, y, init, hypers)
@@ -102,6 +103,7 @@ class ICAR(MCMCModelBase):
         else:
             # ICAR model specific attributes
             self._eta = self.init["eta"]
+            self.regularize = regularize
 
     def _omega_a_update(self) -> None:
 
@@ -123,13 +125,19 @@ class ICAR(MCMCModelBase):
     def _tau_update(self, vec: np.ndarray) -> None:
 
         rate = 0.5 * vec @ self.Q @ vec + self.hypers["rate"]
-        self._tau = np.random.gamma(shape=self._shape, scale=1 / rate)
+        self._tau = np.random.gamma(shape=self._shape, scale=1.0 / rate)
 
     def _eta_update(self) -> None:
         # Cong et al method
         prec = self.Q.copy()
         prec.data = prec.data * self._tau
-        prec.setdiag(prec.diagonal() + self._omega_b)
+        # pertube the diagonal entries of prec to stabilize the
+        # matrix and prevent instability during Cholesky factorization
+        if self.regularize is not None:
+            prec.setdiag(prec.diagonal() + self._omega_b + self.regularize)
+        else:
+            prec.setdiag(prec.diagonal() + self._omega_b)
+
         b = self._k - self._omega_b * (self.X @ self._beta)
         s, sp_chol_factor = affine_sample(b, prec, return_factor=True)
 
