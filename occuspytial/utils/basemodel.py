@@ -3,8 +3,7 @@ from typing import Dict, List, Optional, Tuple, Union
 
 import numpy as np
 
-from occuspytial.utils.misc import CustomDict
-
+from occuspytial.utils.dataprocessing import DetectionDataObject
 ParamType = Dict[str, Union[np.ndarray, float]]
 
 
@@ -68,17 +67,14 @@ class MCMCModelBase(ABC):
             hypers: Optional[ParamType] = {}
     ) -> None:
 
-        self.W = W
+        self.W = DetectionDataObject(W)
         self.X = X
-        self.y = y
+        self.y = DetectionDataObject(y)
         self._n = X.shape[0]  # number of sites in total
         self._s = len(self.y)  # number of surveyed sites
         self._us = self._n - self._s  # number of unsurveyed sites
         self.Xs = X[:self._s]  # X sub-matrix for surveyed sites.
-        self._V = np.array(
-            [self.W[i].shape[0] for i in range(self._s)],
-            dtype=np.int64
-        )
+        self._V = self.W.visits_per_site
         self.hypers, self.init = _set_param_values(X, W, hypers, init)
 
         self._not_obs: List[int] = []  # surveyed sites where not observed
@@ -94,7 +90,7 @@ class MCMCModelBase(ABC):
         # array to store occupancy prob for sites where species is unsurveyed
         self._us_probs = np.zeros(self._us, dtype=float)
         # stacked W matrix for all sites where species is not observed
-        self._W_ = CustomDict(self.W).slice(self.not_obs)
+        self._W_ = self.W[tuple(self.not_obs)]
         # store parameter names to be used in plot labels.
         self._names: List[str] = []
         for i in range(W[0].shape[1]):

@@ -171,8 +171,8 @@ class ICAR(MCMCModelBase):
     def _wk_update(self) -> None:
 
         z_ind = np.where(self._z[:self._s] == 1)[0]
-        self._Wc = CustomDict(self.W).slice(z_ind).T
-        self._kc = CustomDict(self.y).slice(z_ind) - 0.5
+        self._Wc = self.W[tuple(z_ind)].T
+        self._kc = self.y[tuple(z_ind)] - 0.5
 
     def _alpha_update(self) -> None:
 
