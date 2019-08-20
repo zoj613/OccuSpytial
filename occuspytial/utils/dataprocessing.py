@@ -1,7 +1,10 @@
+import logging
 from operator import itemgetter
 from typing import Dict, Iterable, List, Tuple, Optional
 
 import numpy as np
+
+logger = logging.getLogger(__name__)
 
 
 class DetectionDataObject:

@@ -39,6 +39,11 @@ version = 1
 
 [loggers]
 
+  [loggers.dataprocessing]
+  handlers = ["console", "error_file_handler"]
+  level = "ERROR"
+  propagate = false
+
   [loggers.interface]
   handlers = ["console", "error_file_handler"]
   level = "WARNING"

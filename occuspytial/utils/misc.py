@@ -3,7 +3,7 @@ import logging.config
 import os
 from pathlib import Path
 
-from typing import Any, List, Optional, Sequence, Tuple
+from typing import Any, Sequence
 import warnings
 
 import numpy as np  # type: ignore
