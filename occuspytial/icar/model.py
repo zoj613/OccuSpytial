@@ -10,8 +10,8 @@ from scipy.special import expit  # inverse logit
 from pypolyagamma import PyPolyaGamma
 
 from occuspytial.icar.helpers.ctypesfunc import num_prod
-from occuspytial.utils.misc import CustomDict
 from occuspytial.utils.basemodel import MCMCModelBase, ParamType
+from occuspytial.utils.dataprocessing import HyperParams
 from occuspytial.utils.stats import affine_sample
 from occuspytial.utils.visualization import ProgressBar
 
@@ -25,8 +25,7 @@ class RSR:
         self,
         X: np.ndarray,
         Q: csc_matrix,
-        init: ParamType,
-        hypers: ParamType,
+        hypers: HyperParams,
         threshold: float,
         num_of_surveyed_sites: int
     ) -> None:
@@ -59,9 +58,9 @@ class RSR:
         self.Minv = self._K.T @ Q @ self._K
         self._Ks = self._K[:num_of_surveyed_sites]
         self.Q = self.Minv  # replace Q with Minv in the underlying ICAR
-        self._shape = hypers["shape"] + 0.5 * q
+        self._shape = hypers.shape + 0.5 * q
         # theta initial values
-        self._theta = init.get("theta", np.random.normal(0, 1, q))
+        self._theta = np.random.normal(0, 1, q)
 
 
 class ICAR(MCMCModelBase):
@@ -72,8 +71,8 @@ class ICAR(MCMCModelBase):
             W: Dict[int, np.ndarray],
             y: Dict[int, np.ndarray],
             Q: np.ndarray,
-            init: ParamType,
-            hypers: ParamType,
+            init: Optional[ParamType] = None,
+            hypers: Optional[ParamType] = None,
             use_rsr: bool = False,
             threshold: float = 0.5,
             regularize: Optional[float] = None
@@ -90,7 +89,7 @@ class ICAR(MCMCModelBase):
         self._Wc = None
         self._kc = None
         # constant shape parameter for _tau_update method
-        self._shape = self.hypers["shape"] + 0.5 * rank
+        self._shape = self.hypers.shape + 0.5 * rank
         # attributes specific to omega_b update method
         self._omega_a = None
         self._omega_b = np.empty(self._n)
@@ -98,11 +97,11 @@ class ICAR(MCMCModelBase):
         self._use_rsr = use_rsr
         if use_rsr:
             # RSR model specific attributes
-            rsr = RSR(X, self.Q, self.init, self.hypers, threshold, self._s)
+            rsr = RSR(X, self.Q, self.hypers, threshold, self._s)
             self.__dict__.update(rsr.__dict__)
         else:
             # ICAR model specific attributes
-            self._eta = self.init["eta"]
+            self._eta = self.init.eta
             self.regularize = regularize
 
     def _omega_a_update(self) -> None:
@@ -124,7 +123,7 @@ class ICAR(MCMCModelBase):
 
     def _tau_update(self, vec: np.ndarray) -> None:
 
-        rate = 0.5 * vec @ self.Q @ vec + self.hypers["rate"]
+        rate = 0.5 * vec @ self.Q @ vec + self.hypers.rate
         self._tau = np.random.gamma(shape=self._shape, scale=1.0 / rate)
 
     def _eta_update(self) -> None:
@@ -171,12 +170,12 @@ class ICAR(MCMCModelBase):
     def _wk_update(self) -> None:
 
         z_ind = np.where(self._z[:self._s] == 1)[0]
-        self._Wc = self.W[tuple(z_ind)].T
-        self._kc = self.y[tuple(z_ind)] - 0.5
+        self._Wc = self.W[z_ind].T
+        self._kc = self.y[z_ind] - 0.5
 
     def _alpha_update(self) -> None:
 
-        a_mu, a_prec = self.hypers["a_mu"], self.hypers["a_prec"]
+        a_mu, a_prec = self.hypers.alpha_mu, self.hypers.alpha_prec
         prec = (self._Wc * self._omega_a) @ self._Wc.T + a_prec
         b = a_prec @ a_mu + self._Wc @ self._kc
         prec_alpha, upper_tri = affine_sample(b, prec, return_factor=True)
@@ -187,7 +186,7 @@ class ICAR(MCMCModelBase):
 
         k = self._k[:self._s]
         omega = self._omega_b[:self._s]
-        b_mu, b_prec = self.hypers["b_mu"], self.hypers["b_prec"]
+        b_mu, b_prec = self.hypers.beta_mu, self.hypers.beta_prec
         prec = (self.Xs.T * omega) @ self.Xs + b_prec
         if nonspat:
             b = self.Xs.T @ k + b_prec @ b_mu

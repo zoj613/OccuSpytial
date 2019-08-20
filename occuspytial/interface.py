@@ -59,8 +59,8 @@ class Sampler(ConvergenceDiagnostics, Plots):
             W: Dict[int, np.ndarray],
             y: Dict[int, np.ndarray],
             Q: np.ndarray,
-            init: Optional[ParamType] = {},
-            hypers: Optional[ParamType] = {},
+            init: Optional[ParamType] = None,
+            hypers: Optional[ParamType] = None,
             model: str = 'icar',
             chains: int = 2,
             threshold: float = 0.
@@ -78,7 +78,7 @@ class Sampler(ConvergenceDiagnostics, Plots):
             logger.error(f"wrong model choice. {model} is not supported.")
             raise Exception("model choice can only be 'icar' or 'rsr'")
         # set initial values for the additional chains
-        self._new_inits(self.model.init)
+        self._new_inits(self.model.init.__dict__)
         self._names = self.model._names
         self.fullchain = np.array(self._names, ndmin=2)
         self.occ_probs = np.zeros(self.model._n)

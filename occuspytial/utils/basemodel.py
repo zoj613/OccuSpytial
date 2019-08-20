@@ -1,32 +1,15 @@
 from abc import ABC, abstractmethod
-from typing import Dict, List, Optional, Tuple, Union
+from typing import Dict, List, Optional, Union
 
 import numpy as np
 
-from occuspytial.utils.dataprocessing import DetectionDataObject
+from occuspytial.utils.dataprocessing import (
+    DetectionDataObject,
+    HyperParams,
+    InitValues
+)
+
 ParamType = Dict[str, Union[np.ndarray, float]]
-
-
-def _set_param_values(X, W, hypers, inits) -> Tuple[ParamType, ParamType]:
-    """Set default parameter values if none are provided by the user"""
-    hyper_out = {}
-    init_out = {}
-    p = X.shape[1]
-    p_v = W[0].shape[1]
-    n = X.shape[0]
-    hyper_out["a_mu"] = hypers.get("a_mu", np.zeros(p_v))
-    hyper_out["a_prec"] = hypers.get("a_prec", np.diag([1. / 1000] * p_v))
-    hyper_out["b_mu"] = hypers.get("b_mu", np.zeros(p))
-    hyper_out["b_prec"] = hypers.get("b_prec", np.diag([1. / 1000] * p))
-    hyper_out["shape"] = hypers.get("shape", 0.5)
-    hyper_out["rate"] = hypers.get("rate", 0.0005)
-
-    init_out["alpha"] = inits.get("alpha", np.zeros_like(hyper_out["a_mu"]))
-    init_out["beta"] = inits.get("beta", np.zeros_like(hyper_out["b_mu"]))
-    init_out["tau"] = inits.get("tau", 10)
-    init_out["eta"] = inits.get("eta", np.random.uniform(-10, 10, size=n))
-
-    return hyper_out, init_out
 
 
 class MCMCModelBase(ABC):
@@ -63,8 +46,8 @@ class MCMCModelBase(ABC):
             X: np.ndarray,
             W: Dict[int, np.ndarray],
             y: Dict[int, np.ndarray],
-            init: Optional[ParamType] = {},
-            hypers: Optional[ParamType] = {}
+            init: Optional[ParamType] = None,
+            hypers: Optional[ParamType] = None
     ) -> None:
 
         self.W = DetectionDataObject(W)
@@ -75,7 +58,8 @@ class MCMCModelBase(ABC):
         self._us = self._n - self._s  # number of unsurveyed sites
         self.Xs = X[:self._s]  # X sub-matrix for surveyed sites.
         self._V = self.W.visits_per_site
-        self.hypers, self.init = _set_param_values(X, W, hypers, init)
+        self.hypers = HyperParams(hypers, X, W)
+        self.init = InitValues(init, X, W)
 
         self._not_obs: List[int] = []  # surveyed sites where not observed
         # initialize z, the site occupancy state
@@ -84,13 +68,13 @@ class MCMCModelBase(ABC):
             if not any(self.y[i]):
                 self._not_obs.append(i)
                 self._z[i] = 0
-        self.not_obs: np.ndarray = np.array(self._not_obs, dtype=int)
+        self.not_obs = np.array(self._not_obs, dtype=int)
         # array to store prob updates for sites where species is not obversed
         self._probs = np.zeros(self.not_obs.size, dtype=float)
         # array to store occupancy prob for sites where species is unsurveyed
         self._us_probs = np.zeros(self._us, dtype=float)
         # stacked W matrix for all sites where species is not observed
-        self._W_ = self.W[tuple(self.not_obs)]
+        self._W_ = self.W[self.not_obs]
         # store parameter names to be used in plot labels.
         self._names: List[str] = []
         for i in range(W[0].shape[1]):
@@ -100,9 +84,9 @@ class MCMCModelBase(ABC):
         # specify the names of the posterior parameters
         self._names.append("PAO")
         self._names.append(r"$\tau$")
-        self._alpha = self.init["alpha"]  # inital values for alpha
-        self._beta = self.init["beta"]  # initial values for beta
-        self._tau = self.init["tau"]  # initial values for tau
+        self._alpha = self.init.alpha  # inital values for alpha
+        self._beta = self.init.beta  # initial values for beta
+        self._tau = self.init.tau  # initial values for tau
         self.avg_occ_probs = np.ones(self._n)
 
     @abstractmethod
