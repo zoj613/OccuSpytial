@@ -17,7 +17,7 @@ len_beta = len(true_beta)
 
 n = 1600  # n is the number of sites visited
 K_ = int(0.05 * n)  # K_ = number of visits per site
-surv_sites = int(0.5 * n) # number of surveyed sites
+surv_sites = int(0.5 * n)  # number of surveyed sites
 # To simplify things we assume the number of visits is the same for all sites
 K = np.repeat(K_, surv_sites)
 
