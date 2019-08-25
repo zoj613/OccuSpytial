@@ -11,7 +11,7 @@ Clark AE, Altwegg R. Efficient Bayesian analysis of occupancy models with logit 
 
 currently this package can be installed by downloading the repository and running the following command on the folder with the package:
 
-```{shell}
+```shell
    git clone https://github.com/zoj613/OccuSpytial.git
    cd OccuSpytial
    python setup.py install
@@ -24,8 +24,8 @@ It is strongly recommended that you have the package `scikit-sparse` installed b
 To run tests after installation, the package `pytest` is required. Simply run
 the following line from the terminal in this package's root directory.
 
-```{shell}
-python -m pytest
+```shell
+    python -m pytest
 ```
 
 If all tests pass, then you're good to go.
@@ -40,7 +40,7 @@ The initializing `Sampler` class accepts:
 * a 2-D numpy / sparse-matrix `Q` (the ICAR model precision matrix).
 * Only 2 models are supported currently, namely ICAR and RSR (Reduced Spatial Regression).
 
-```{python}
+```python
     from occuspytial.interface import Sampler
     import numpy as np
     from datamodule import X, W, y, Q  # datamodule is the file with all the arrays X, W, y and Q
