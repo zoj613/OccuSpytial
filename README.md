@@ -1,35 +1,37 @@
-OccuSpytial
------------
+# OccuSpytial
 
 A package for fast bayesian analysis of spatial occupancy models. OccuSpytial implements an efficient Gibbs Sampler for the single season site spatial occupancy model using the Intrinsic Conditional Autoregressive (ICAR) model for spatial random effects. The Gibbs sampler is made possible by using Polya-Gamma data-augmentation to obtain closed form expressions for the full conditional distributions of the parameters of interest when using the logit link function to model the occupancy and detection probabilities. Multiple chains of the Gibbs sampler are ran in parallel.
 
-References
-----------
+## References
+
 For more information regarding this implementation please refer to the following paper:
 Clark AE, Altwegg R. Efficient Bayesian analysis of occupancy models with logit link functions. Ecol Evol. 2019;9:756–768.
 
-Installation
-------------
+## Installation
+
 currently this package can be installed by downloading the repository and running the following command on the folder with the package:
-```
+
+```{shell}
    git clone https://github.com/zoj613/OccuSpytial.git
    cd OccuSpytial
    python setup.py install
 ```
- 
+
 It is strongly recommended that you have the package `scikit-sparse` installed before using this package in order to fully take advantage of the speed gains possible. Using this package with `scikit-sparse` installed results in significant speedup during sampling.
 
-Testing
--------
+## Testing
+
 To run tests after installation, the package `pytest` is required. Simply run
 the following line from the terminal in this package's root directory.
-```
+
+```{shell}
 python -m pytest
 ```
+
 If all tests pass, then you're good to go.
 
-Usage
------
+## Usage
+
 The initializing `Sampler` class accepts:
 
 * a 2-D numpy array `X` (occupancy effects design matrix).
@@ -37,7 +39,8 @@ The initializing `Sampler` class accepts:
 * a python dictionary object `y` (each key-value entry is the site number and an array containing the detection/non-detection info of that particular site).
 * a 2-D numpy / sparse-matrix `Q` (the ICAR model precision matrix).
 * Only 2 models are supported currently, namely ICAR and RSR (Reduced Spatial Regression).
-```python
+
+```{python}
     from occuspytial.interface import Sampler
     import numpy as np
     from datamodule import X, W, y, Q  # datamodule is the file with all the arrays X, W, y and Q
@@ -66,9 +69,6 @@ The initializing `Sampler` class accepts:
     # print the summary table containing the posterior estimates of the parameters, their standard errors and convergence diagnostics info
     print(icarmodel.summary)
     print(icarmodel.summary[0][1])  # indexing is supported.
-    icarmodel.trace_plots(show=True) # display the traceplots of the parameters 
+    icarmodel.trace_plots(show=True) # display the traceplots of the parameters
     icarmodel.corr_plots(show=True) # display the correlation plots
  ```
-TO DO
------
-* Add a folder with dummy data and a usage example notebook.
