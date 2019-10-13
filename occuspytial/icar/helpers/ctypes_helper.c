@@ -1,17 +1,17 @@
 #include <stddef.h>
-void _prod(double *omd, long *not_obs, size_t not_obs_size, long *V, double *num);
+void _proba(double* omd, size_t* not_obs, size_t not_obs_size, size_t* V, double* occ_proba);
 
-void _prod(double *omd, long *not_obs, size_t not_obs_size, long *V, double *num) 
+void _proba(double* omd, size_t* not_obs, size_t not_obs_size, size_t* V, double* occ_proba) 
 {
-    size_t i, j, count = 0, omd_indx, v_size, v_indx;
-    
-    for (i = 0; i < not_obs_size; ++i){
-        v_indx = not_obs[i];
-        v_size = V[v_indx];
-        for (j = 0; j < v_size; ++j){
-            omd_indx = count + j;
-            num[i] *= omd[omd_indx];
+    size_t count = 0;
+    double old_occ_proba;
+
+    for (size_t i = 0; i < not_obs_size; i++){
+        old_occ_proba = occ_proba[i];
+        for (size_t j = 0; j < V[not_obs[i]]; j++){
+            occ_proba[i] *= omd[count + j];
         };
-        count += v_size;
+        occ_proba[i] /= (1. - old_occ_proba + occ_proba[i]);
+        count += V[not_obs[i]];
     };
 }

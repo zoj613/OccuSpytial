@@ -9,7 +9,7 @@ from scipy.sparse.linalg import splu
 from scipy.special import expit  # inverse logit
 from pypolyagamma import PyPolyaGamma
 
-from occuspytial.icar.helpers.ctypesfunc import num_prod
+from occuspytial.icar.helpers.ctypesfunc import occu_prob
 from occuspytial.utils.basemodel import MCMCModelBase, ParamType
 from occuspytial.utils.dataprocessing import HyperParams
 from occuspytial.utils.stats import affine_sample
@@ -169,7 +169,7 @@ class ICAR(MCMCModelBase):
 
     def _wk_update(self) -> None:
 
-        z_ind = np.where(self._z[:self._s] == 1)[0]
+        z_ind = (self._z[:self._s] == 1).nonzero()[0]
         self._Wc = self.W[z_ind].T
         self._kc = self.y[z_ind] - 0.5
 
@@ -205,30 +205,24 @@ class ICAR(MCMCModelBase):
             occ = expit(self.X[self.not_obs] @ self._beta + vec[self.not_obs])
 
         omd = expit(self._W_ @ -self._alpha)
-        # calculate the numerator product for each site i
-        # in the expression for the probability of z=1 | y=0
-        # num_prod stores the product on the object self._probs.
-        self._probs = occ.copy()
-        num_prod(
-            omd, self.not_obs, self.not_obs.shape[0], self._V, self._probs
-        )
-        # use the stored values to calculate the probability
-        self._probs /= (1 - occ + self._probs)
+        # calculate occupancy probability of each site where species was not
+        # observed. The return value of `num_prod` is stored on `occ` param.
+        occu_prob(omd, self.not_obs, self.num_of_not_obs, self._V, occ)
         # update the occupancy state array by sampling from a Bernoulli with \
-        # self._prob as its parameter value.
-        self._z[self.not_obs] = np.random.binomial(n=1, p=self._probs)
+        # updated occ as its parameter value.
+        self._z[self.not_obs] = np.random.binomial(n=1, p=occ)
 
         # sampling for sites not surveyed
         if self._us > 0:
             # calc the probability of z = 1 | site i not surveyed
             if nonspat:
-                self._us_probs = expit(self.X[-self._us:] @ self._beta)
+                us_probs = expit(self.X[-self._us:] @ self._beta)
             else:
-                self._us_probs = expit(
+                us_probs = expit(
                     self.X[-self._us:] @ self._beta + vec[-self._us:]
                 )
             # update occupancy state by sampling from a Bernoulli(us_prob)
-            self._z[-self._us:] = np.random.binomial(n=1, p=self._us_probs)
+            self._z[-self._us:] = np.random.binomial(n=1, p=us_probs)
         self._k = self._z - 0.5  # update k = _z - 0.5 for next iteration
 
     def _update_func(

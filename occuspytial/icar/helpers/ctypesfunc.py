@@ -25,12 +25,12 @@ else:
     raise Exception("Platform is not supported.")
 
 _lib = ctypes.cdll.LoadLibrary(_sharedlib_path.as_posix())
-num_prod = _lib._prod
-num_prod.restype = None
-num_prod.argtypes = [
+occu_prob = _lib._proba
+occu_prob.restype = None
+occu_prob.argtypes = [
     ndpointer(ctypes.c_double, flags="C_CONTIGUOUS"),
-    ndpointer(ctypes.c_long, flags="C_CONTIGUOUS"),
+    ndpointer(ctypes.c_size_t, flags="C_CONTIGUOUS"),
     ctypes.c_size_t,
-    ndpointer(ctypes.c_long, flags="C_CONTIGUOUS"),
+    ndpointer(ctypes.c_size_t, flags="C_CONTIGUOUS"),
     ndpointer(ctypes.c_double, flags="C_CONTIGUOUS")
 ]
