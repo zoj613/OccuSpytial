@@ -45,7 +45,7 @@ class DetectionDataObject:
         """Get the number of visits per surveyed site."""
         surveyed_sites = range(len(self))
         visits = tuple(self.data[i].shape[0] for i in surveyed_sites)
-        return np.array(visits, dtype=np.int64)
+        return np.array(visits, dtype=np.uint64)
 
 
 class HyperParams:
