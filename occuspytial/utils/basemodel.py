@@ -60,19 +60,13 @@ class MCMCModelBase(ABC):
         self._V = self.W.visits_per_site
         self.hypers = HyperParams(hypers, X, W)
         self.init = InitValues(init, X, W)
-
-        self._not_obs: List[int] = []  # surveyed sites where not observed
         # initialize z, the site occupancy state
-        self._z = np.ones(self._n, dtype=int)
-        for i in range(self._s):
-            if not any(self.y[i]):
-                self._not_obs.append(i)
-                self._z[i] = 0
-        self.not_obs = np.array(self._not_obs, dtype=int)
-        # array to store prob updates for sites where species is not obversed
-        self._probs = np.zeros(self.not_obs.size, dtype=float)
-        # array to store occupancy prob for sites where species is unsurveyed
-        self._us_probs = np.zeros(self._us, dtype=float)
+        self._z = np.ones(self._n, dtype=np.uint64)
+        self._z[:self._s] = [
+            0 if not any(self.y[i]) else 1 for i in range(self._s)
+        ]
+        self.not_obs = (self._z == 0).nonzero()[0].astype(np.uint64)
+        self.num_of_not_obs = self.not_obs.size
         # stacked W matrix for all sites where species is not observed
         self._W_ = self.W[self.not_obs]
         # store parameter names to be used in plot labels.
