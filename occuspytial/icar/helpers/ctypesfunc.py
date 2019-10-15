@@ -30,7 +30,7 @@ occu_prob.restype = None
 occu_prob.argtypes = [
     ndpointer(ctypes.c_double, flags="C_CONTIGUOUS"),
     ndpointer(ctypes.c_size_t, flags="C_CONTIGUOUS"),
-    ctypes.pointer(ctypes.c_size_t),#c_size_t,
+    ctypes.c_size_t,
     ndpointer(ctypes.c_size_t, flags="C_CONTIGUOUS"),
     ndpointer(ctypes.c_double, flags="C_CONTIGUOUS")
 ]
