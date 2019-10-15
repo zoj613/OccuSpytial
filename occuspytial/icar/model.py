@@ -1,3 +1,4 @@
+import ctypes as ct
 import logging
 from typing import Callable, Dict, Optional
 
@@ -207,7 +208,9 @@ class ICAR(MCMCModelBase):
         omd = expit(self._W_ @ -self._alpha)
         # calculate occupancy probability of each site where species was not
         # observed. The return value of `num_prod` is stored on `occ` param.
-        occu_prob(omd, self.not_obs, self.num_of_not_obs, self._V, occ)
+        occu_prob(
+            omd, self.not_obs, ct.byref(self.num_of_not_obs), self._V, occ
+        )
         # update the occupancy state array by sampling from a Bernoulli with \
         # updated occ as its parameter value.
         self._z[self.not_obs] = np.random.binomial(n=1, p=occ)
