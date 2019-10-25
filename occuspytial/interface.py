@@ -1,7 +1,7 @@
-from multiprocessing import Pool
 import logging
 from typing import Dict, Optional, Tuple, Union
 
+from joblib import Parallel, delayed, parallel_backend
 import numpy as np  # type: ignore
 
 from occuspytial.icar.model import ICAR, ParamType
@@ -54,37 +54,44 @@ class Sampler(ConvergenceDiagnostics, Plots):
     """
 
     def __init__(
-            self,
-            X: np.ndarray,
-            W: Dict[int, np.ndarray],
-            y: Dict[int, np.ndarray],
-            Q: np.ndarray,
-            init: Optional[ParamType] = None,
-            hypers: Optional[ParamType] = None,
-            model: str = 'icar',
-            chains: int = 2,
-            threshold: float = 0.
+        self,
+        X: np.ndarray,
+        W: Dict[int, np.ndarray],
+        y: Dict[int, np.ndarray],
+        Q: np.ndarray,
+        init: Optional[ParamType] = None,
+        hypers: Optional[ParamType] = None,
+        model: str = 'icar',
+        chains: int = 2,
+        threshold: float = 0.
     ) -> None:
 
-        self.mode = model
         self.n_chains = chains
-        if model.lower() == 'icar':
-            self.model = ICAR(X, W, y, Q, init, hypers)
-        elif model.lower() == 'rsr':
-            self.model = ICAR(
-                X, W, y, Q, init, hypers, use_rsr=True, threshold=threshold
-            )
-        else:
-            logger.error(f"wrong model choice. {model} is not supported.")
-            raise Exception("model choice can only be 'icar' or 'rsr'")
+        self.model = self._get_model(
+            model, chains, X, W, y, Q, init, hypers,
+            use_rsr=True, threshold=threshold
+        )
         # set initial values for the additional chains
-        self._new_inits(self.model.init.__dict__)
-        self._names = self.model._names
+        self._new_inits(self.model[0].init.__dict__)
+        self._names = self.model[0]._names
         self.fullchain = np.array(self._names, ndmin=2)
-        self.occ_probs = np.zeros(self.model._n)
+        self.occ_probs = np.zeros(self.model[0]._n)
+
+    def _get_model(self, alias, chains, X, W, y, Q, init, hypers, **kwargs):
+        """Return a list of model instances equal to the number of chains."""
+        if alias.lower() not in {'icar', 'rsr'}:
+            logger.error(f"wrong model choice. {alias} is not supported.")
+            raise ValueError("model choice can only be one of {'icar', 'rsr'}")
+
+        return [
+            ICAR(X, W, y, Q, init, hypers)
+            if alias.lower() == 'icar'
+            else ICAR(X, W, y, Q, init, hypers, **kwargs)
+            for _ in range(chains)
+        ]
 
     def _new_inits(self, init: ParamType) -> None:
-        """ Set new initial parameter values. """
+        """ Set parameter values for each model instance. """
         self.inits = [init]
         for _ in range(1, self.n_chains):
             # create multiple initial values for the additional chains
@@ -107,13 +114,13 @@ class Sampler(ConvergenceDiagnostics, Plots):
         return model._traces, model.z_mat.mean(axis=0)
 
     def run(
-            self,
-            iters: int = 1000,
-            burnin: Optional[int] = None,
-            new_init: Optional[ParamType] = None,
-            progressbar: bool = True,
-            nonspatial: bool = False,
-            regularize: Optional[float] = None
+        self,
+        iters: int = 1000,
+        burnin: Optional[int] = None,
+        new_init: Optional[ParamType] = None,
+        progressbar: bool = True,
+        nonspatial: bool = False,
+        regularize: Optional[float] = None
     ) -> None:
         """Perform the sampling of posterior parameters of the model.
         Sampling ia done in parallel for each of the number of chains
@@ -139,20 +146,20 @@ class Sampler(ConvergenceDiagnostics, Plots):
             logger.debug("setting parameter initial values")
             self._new_inits(new_init)
 
-        if regularize is not None and self.model.__class__.__name__ == 'ICAR':
-            self.model.regularize = regularize
+        if regularize is not None and self.model[0].__class__.__name__ == 'ICAR':
+            for model in self.model:
+                model.regularize = regularize
 
         setattr(self, 'nonspat', nonspatial)
 
         args = [
-            (self.model, iters, burnin, init, progressbar, nonspatial)
-            for init
-            in self.inits
+            (model, iters, burnin, init, progressbar, nonspatial)
+            for init, model
+            in zip(self.inits, self.model)
         ]
         logger.debug("distributing the sampler among workers...")
-        with Pool() as pool:
-            logger.debug(f"Pool currently using {pool._processes} processes.")
-            for chain, avg_occ in pool.map(self, args):
+        with parallel_backend('loky', n_jobs=-1):
+            for chain, avg_occ in Parallel()(delayed(self)(i) for i in args):
                 self.fullchain = np.concatenate((self.fullchain, chain))
                 self.occ_probs += avg_occ
         logger.info("sampling completed successfully.")
