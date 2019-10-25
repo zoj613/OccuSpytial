@@ -15,10 +15,10 @@ plt.style.use('ggplot')
 class Plots:
 
     def trace_plots(
-            self,
-            show: bool = True,
-            save: bool = False,
-            name: str = 'traces'
+        self,
+        show: bool = True,
+        save: bool = False,
+        name: str = 'traces'
     ) -> None:
         """Generate the traceplots of the posterior samples of the para-
         meters of interest. The plots can be displayed in one single
@@ -66,11 +66,11 @@ class Plots:
         plt.show() if show else plt.clf()
 
     def corr_plots(
-            self,
-            num_lags: int = 50,
-            show: bool = True,
-            save: bool = False,
-            name: str = 'corr'
+        self,
+        num_lags: int = 50,
+        show: bool = True,
+        save: bool = False,
+        name: str = 'corr'
     ) -> None:
         """Generate the autocorrelation plots of the posterior samples
         of the parameters of interest. The plots can be displayed in one
@@ -138,17 +138,11 @@ class ProgressBar:
     BAR_LENGTH = 25
 
     def __init__(self, n: int) -> None:
-
-        if sys.stdout.isatty():  # check if script is running from console
-            self._FILE = open(sys.stdout.fileno(), mode='w', encoding='utf8')
-            fill = "█"
-        else:
-            fill = "#"
-
+        self._FILE = open(sys.stderr.fileno(), mode='w', encoding='utf8')
         self.start = time.monotonic()
         self.n = n
         self.i = 0
-        self.fill = fill
+        self.fill = "█"
         self.progress = 0
 
     def _bar_string(self) -> str:
@@ -179,12 +173,6 @@ class ProgressBar:
     def update(self) -> None:
         """Update the progress bar output"""
         self.i += 1
-        # decide how to print the bar depending on whether standard
-        # output is the terminal or not.
-        if sys.stdout.isatty():
-            print(self._bar_string(), file=self._FILE, end='\r')
-        else:
-            print(self._bar_string(), end='\r')
-        # stoping condition, finishing printing if progress is at 100%.
+        print(self._bar_string(), file=self._FILE, end='\r')
         if self.progress == 1:
             print()
