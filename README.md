@@ -12,12 +12,19 @@ Clark AE, Altwegg R. Efficient Bayesian analysis of occupancy models with logit 
 currently this package can be installed by downloading the repository and running the following command on the folder with the package:
 
 ```shell
+   curl -SSL https://raw.githubusercontent.com/sdispater/poetry/master/get-poetry.py | python
    git clone https://github.com/zoj613/OccuSpytial.git
    cd OccuSpytial
-   python setup.py install
+   export PATH="$HOME/.poetry/bin:$PATH"
+   poetry install
 ```
 
 It is strongly recommended that you have the package `scikit-sparse` installed before using this package in order to fully take advantage of the speed gains possible. Using this package with `scikit-sparse` installed results in significant speedup during sampling.
+One can install `scikit-sparse` using the command:
+
+```shell
+   poetry install -E scikit-sparse
+```
 
 ## Testing
 
@@ -69,6 +76,6 @@ The initializing `Sampler` class accepts:
     # print the summary table containing the posterior estimates of the parameters, their standard errors and convergence diagnostics info
     print(icarmodel.summary)
     print(icarmodel.summary[0][1])  # indexing is supported.
-    icarmodel.trace_plots(show=True) # display the traceplots of the parameters
-    icarmodel.corr_plots(show=True) # display the correlation plots
+    icarmodel.trace_plots(show=True, save=True) # display the traceplots of the parameters
+    icarmodel.corr_plots(show=True, save=True) # display the correlation plots
  ```
