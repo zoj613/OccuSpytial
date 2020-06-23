@@ -1,12 +1,23 @@
 from distutils.command.build_ext import build_ext
 from distutils.core import Extension
 
-ext = [
-   Extension(
-       'occuspytial.icar.helpers.helper',
-       sources=['occuspytial/icar/helpers/ctypes_helper.c']
-   )
+import numpy as np
+from Cython.Build import cythonize
+
+extensions = [
+    Extension(
+        "occuspytial/**", ["occuspytial/**.pyx"],
+        include_dirs=[np.get_include()],
+        library_dirs=[np.get_include()],
+    ),
+    Extension(
+        "occuspytial/gibbs/*", ["occuspytial/gibbs/*.pyx"],
+        include_dirs=[np.get_include()],
+        library_dirs=[np.get_include()],
+    ),
 ]
+
+ext = cythonize(extensions, include_path=[np.get_include()], annotate=True)
 
 
 # source: https://github.com/sdispater/pendulum/blob/1.x/build.py
