@@ -16,12 +16,13 @@ include = ["occuspytial/**/.c"]
 build = "build.py"
 
 [tool.poetry.dependencies]
-python = "3.6.*"
-beautifultable = "0.7.0"
-pypolyagamma = "^1.2"
-matplotlib = "3.1.0"
-scipy = "0.19.0"
+python = "^3.6"
+pypolyagamma = "^1.2.3"
+scipy = "1.2.1"
 joblib = "^0.14.0"
+numpy = "^1.19.0"
+tqdm = "^4.46.1"
+arviz = "^0.9.0"
 scikit-sparse = {version = "*", optional = true}
 toml = {version = "^0.10.0", optional = true}
 
