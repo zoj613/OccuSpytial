@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 from copy import deepcopy
 
 import numpy as np
-from scipy.sparse import csc_matrix, isspmatrix_csc, issparse
+from scipy.sparse import csc_matrix, isspmatrix_csc
 from scipy.sparse.linalg import eigsh
 from tqdm import tqdm
 
@@ -35,7 +35,7 @@ class GibbsBase(ABC):
     def step(self):
         pass
 
-    def _configure(self, Q, hparams, verify_precision=True,**kwargs):
+    def _configure(self, Q, hparams, verify_precision=True, **kwargs):
         if verify_precision:
             self._verify_spatial_precision(Q)
 

@@ -59,14 +59,18 @@ cdef class SparseMultivariateNormal(Distribution):
 
 cdef class DenseMultivariateNormal(Distribution):
 
-    cpdef tuple rvs(self, double[:] mean, double[::1, :] cov):
+    cpdef tuple rvs(self, double[:] mean, double[::1, :] cov, bint overwrite_cov=True):
         cdef int n = mean.shape[0]
         cdef Py_ssize_t i
         cdef int info, incx = 1
+        cdef double[::1, :] chol = cov
+
+        if not overwrite_cov:
+            chol = np.copy(cov, order='F')
 
         with nogil:
             # LAPACK cholesky decomposition
-            dpotrf('U', &n, &cov[0, 0], &n, &info)
+            dpotrf('U', &n, &chol[0, 0], &n, &info)
 
         if info != 0:
             raise RuntimeError('Cholesky Factorization failed')
@@ -77,11 +81,11 @@ cdef class DenseMultivariateNormal(Distribution):
 
         with nogil:
             # BLAS matrix-vector product
-            dtrmv('U', 'T', 'N', &n, &cov[0, 0], &n, &std_v[0], &incx)
+            dtrmv('U', 'T', 'N', &n, &chol[0, 0], &n, &std_v[0], &incx)
             for i in range(n):
                 std_v[i] += mean[i]
 
-        return std, cov
+        return std, chol
 
 
 
