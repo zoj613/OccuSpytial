@@ -34,5 +34,5 @@ scikit-sparse = ["scikit-sparse"]
 toml = ["toml"]
 
 [build-system]
-requires = ["poetry>=0.12"]
+requires = ["poetry>=0.12", "Cython>=0.29.20"]
 build-backend = "poetry.masonry.api"

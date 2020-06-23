@@ -1,8 +1,7 @@
-from distutils.command.build_ext import build_ext
 from distutils.core import Extension
 
 import numpy as np
-from Cython.Build import cythonize
+from Cython.Build import cythonize, build_ext
 
 extensions = [
     Extension(
@@ -17,7 +16,7 @@ extensions = [
     ),
 ]
 
-ext = cythonize(extensions, include_path=[np.get_include()], annotate=True)
+ext = cythonize(extensions, include_path=[np.get_include()])
 
 
 # source: https://github.com/sdispater/pendulum/blob/1.x/build.py
