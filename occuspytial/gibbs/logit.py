@@ -35,7 +35,8 @@ class LogitICARGibbs(GibbsBase):
         self.dists.mvnorm = DenseMultivariateNormal2()
 
     def _update_omega_a(self):
-        self.state.exists = self.state.z[self.W.surveyed].nonzero()[0]
+        not_obs_occupancy = [i for i in self.fixed.not_obs if self.state.z[i]]
+        self.state.exists = self.fixed.obs + not_obs_occupancy
         self.state.W = self.W[self.state.exists]
         b = self.state.W @ self.state.alpha
         self.dists.pg.rvs(np.ones_like(b), b, b)
