@@ -83,7 +83,8 @@ class ProbitRSRGibbs(GibbsBase):
             self.state.spatial = self.fixed.K @ self.state.eta
 
     def _update_omega_a(self):
-        self.state.exists = self.state.z[self.W.surveyed].nonzero()[0]
+        not_obs_occupancy = [i for i in self.fixed.not_obs if self.state.z[i]]
+        self.state.exists = self.fixed.obs + not_obs_occupancy
         obs_mask = (self.y[self.state.exists] == 1)
         self.state.W = self.W[self.state.exists]
         loc = self.state.W @ self.state.alpha

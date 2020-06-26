@@ -53,12 +53,10 @@ class GibbsBase(ABC):
         self.fixed.not_surveyed = [
             site for site in range(self.fixed.n) if site not in self.y.surveyed
         ]
-        self.fixed.not_obs = (self.state.z[self.W.surveyed] == 0).nonzero()[0]
+        self.fixed.not_obs = [i for i in self.y.surveyed if not self.state.z[i]]
+        self.fixed.obs = [i for i in self.y.surveyed if self.state.z[i]]
         self.fixed.W_not_obs = self.W[self.fixed.not_obs]
         self.fixed.visits_not_obs = self.W.visits(self.fixed.not_obs)
-        self.fixed.visits = [
-            self.W.data[i].shape[0] for i in self.y.surveyed
-        ]
         sections = np.cumsum(self.fixed.visits_not_obs)
         self.fixed.sections = np.pad(sections, (1, 0))
         self.state.section_sums = np.zeros(sections.shape[0], dtype=np.double)
@@ -86,7 +84,7 @@ class GibbsBase(ABC):
     def _set_default_hyperparams(self, params):
         params.tau_rate = 0.005
         params.tau_shape = 0.5 + 0.5 * (self.fixed.n - 1)
-        alpha_size = self.W[0].shape[1]
+        alpha_size = self.W[self.W.surveyed[0]].shape[1]
         params.a_mu = np.zeros(alpha_size)
         params.a_prec = np.eye(alpha_size) / 10
         beta_size = self.X.shape[1]
@@ -107,7 +105,7 @@ class GibbsBase(ABC):
     def _initialize_default_start(self, state):
         state.tau = self.rng.gamma(0.5, 1 / self.fixed.tau_rate)
         eta = self.rng.standard_normal(self.fixed.n)
-        eta[-1] = -eta[:-1].sum()
+        eta = eta - eta.mean()
         state.eta = eta
         state.spatial = self.state.eta
         state.alpha = self.rng.multivariate_normal(
