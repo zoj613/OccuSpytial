@@ -70,8 +70,6 @@ class GibbsBase(ABC):
             self.fixed = self._set_default_hyperparams(self.fixed)
         self.fixed.a_prec_by_mu = self.fixed.a_prec @ self.fixed.a_mu
         self.fixed.b_prec_by_mu = self.fixed.b_prec @ self.fixed.b_mu
-        self.fixed.zeros_no = self.fixed.zeros[self.fixed.not_obs]
-        self.fixed.zeros_ns = self.fixed.zeros[self.fixed.not_surveyed]
 
         self.dists = FixedState()
 
