@@ -2,7 +2,7 @@ import numpy as np
 from numpy.linalg import multi_dot
 from scipy.linalg import solve_triangular, eigh
 from scipy.special import ndtr, log_ndtr  # std norm cdf and its log
-from scipy.stats import truncnorm, norm
+from scipy.stats import truncnorm
 
 from ..distributions import DenseMultivariateNormal2
 
@@ -143,7 +143,13 @@ class ProbitRSRGibbs(GibbsBase):
         w_a = self.fixed.W_not_obs @ self.state.alpha
         num1 = ndtr(xb_eta)
         lognum1 = log_ndtr(xb_eta)
-        lognum2 = norm.logsf(w_a)
+        # clip the values of the survival function to be no less than 1e-4
+        # as an attempt to stabilize taking the log of a nearly zero value
+        # and prevent the output from being a -infinity which causes the
+        # binomial probabilities to go outside the range [0, 1] for those
+        # values.
+        num2sf = np.clip(1 - ndtr(w_a), a_min=1e-4, a_max=np.inf)
+        lognum2 = np.log(num2sf)
         split_sum(lognum2, self.fixed.sections, self.state.section_sums)
         lognum = lognum1 + self.state.section_sums
         prod_sf = np.exp(self.state.section_sums)
