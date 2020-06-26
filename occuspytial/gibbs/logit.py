@@ -30,8 +30,6 @@ class LogitICARGibbs(GibbsBase):
         else:
             self.fixed.pertub = pertub
 
-        self.fixed.wzeros_no = np.zeros(self.fixed.W_not_obs.shape[0])
-        self.fixed.ones_no = np.ones((3, self.fixed.zeros_no.shape[0]))
         self.dists.pg = PolyaGamma()
         self.dists.sum2zero_mvnorm = SumToZeroMultivariateNormal()
         self.dists.mvnorm = DenseMultivariateNormal2()
@@ -82,18 +80,18 @@ class LogitICARGibbs(GibbsBase):
         spat = self.state.spatial
 
         xb_eta = self.X[no] @ beta + spat[no]
-        y = -np.logaddexp(self.fixed.zeros_no, -xb_eta)
+        y = -np.logaddexp(0, -xb_eta)
         w_a = self.fixed.W_not_obs @ self.state.alpha
-        omd = -np.logaddexp(self.fixed.wzeros_no, w_a)
+        omd = -np.logaddexp(0, w_a)
         split_sum(omd, self.fixed.sections, self.state.section_sums)
         x = y + self.state.section_sums
-        c = -np.logaddexp(self.fixed.zeros_no, xb_eta)
+        c = -np.logaddexp(0, xb_eta)
         logp = x - np.logaddexp(c, x)
         self.state.z[no] = self.rng.binomial(n=1, p=np.exp(logp))
 
         if ns:
             xb_eta_ns = self.X[ns] @ beta + spat[ns]
-            logp = -np.logaddexp(self.fixed.zeros_ns, -xb_eta_ns)
+            logp = -np.logaddexp(0, -xb_eta_ns)
             self.state.z[ns] = self.rng.binomial(n=1, p=np.exp(logp))
 
         self.state.k = self.state.z - 0.5
