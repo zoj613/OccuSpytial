@@ -30,9 +30,10 @@ class LogitICARGibbs(GibbsBase):
         else:
             self.fixed.pertub = pertub
 
-        self.dists.pg = PolyaGamma()
-        self.dists.sum2zero_mvnorm = SumToZeroMultivariateNormal()
-        self.dists.mvnorm = DenseMultivariateNormal2()
+        random_state = self.random_state
+        self.dists.pg = PolyaGamma(random_state)
+        self.dists.sum2zero_mvnorm = SumToZeroMultivariateNormal(random_state)
+        self.dists.mvnorm = DenseMultivariateNormal2(random_state)
 
     def _update_omega_a(self):
         not_obs_occupancy = [i for i in self.fixed.not_obs if self.state.z[i]]
@@ -49,7 +50,7 @@ class LogitICARGibbs(GibbsBase):
 
     def _update_tau(self):
         eta = self.state.eta
-        rate = (0.5 * eta @ self.fixed.Q @ eta) + self.fixed.tau_rate
+        rate = 0.5 * eta @ (self.fixed.Q * eta) + self.fixed.tau_rate
         self.state.tau = self.rng.gamma(self.fixed.tau_shape, 1 / rate)
 
     def _update_eta(self):

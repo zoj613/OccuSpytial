@@ -6,7 +6,12 @@
 from numbers import Number
 import warnings
 
+from cpython.pycapsule cimport PyCapsule_IsValid, PyCapsule_GetPointer
 import numpy as np
+cimport numpy as np
+from numpy.random cimport bitgen_t
+from numpy.random.c_distributions cimport random_standard_normal_fill
+
 from pypolyagamma import PyPolyaGamma
 from scipy.linalg.cython_blas cimport dtrmv, dtrsv
 from scipy.linalg.cython_lapack cimport dpotrf
@@ -29,31 +34,46 @@ __all__ = (
     'PolyaGamma',
 )
 
+
 cdef dict OPTS = {'SymmetricMode': True}
 
 
 cdef class Distribution:
-    cdef object seed
-    cdef object rng
+    cdef object random_state
+    cdef object bitgen
+    cdef bitgen_t* rng
 
-    def __cinit__(self, seed=None):
-        self.seed = seed
-        self.rng = np.random.default_rng(seed)
+    def __cinit__(self, random_state=None):
+        self.bitgen = np.random.PCG64(random_state)
+        cdef const char* capsule_name = 'BitGenerator'
+        capsule = self.bitgen.capsule
+
+        if not PyCapsule_IsValid(capsule, capsule_name):
+            raise ValueError("Invalid pointer to anon_func_state")
+
+        self.rng = <bitgen_t*>PyCapsule_GetPointer(capsule, capsule_name)
+        self.random_state = random_state
 
     def __reduce__(self):
-        return self.__class__, (self.seed,)
+        return self.__class__, (self.random_state,)
 
 
 cdef class SparseMultivariateNormal(Distribution):
 
     cpdef tuple rvs(self, double[:] mean, cov):
         cdef int size = mean.shape[0]
+        cdef np.ndarray arr = np.empty(size)
 
         factor = sparse_cholesky(cov, ordering_method='default')
         L = factor.L()
         chol = factor.apply_Pt(L)
-        arr = self.rng.standard_normal(size)
-        arr = mean + chol @ arr
+
+        with self.bitgen.lock, nogil:
+            random_standard_normal_fill(
+                self.rng, size, <double*>np.PyArray_DATA(arr)
+            )
+
+        arr = mean + chol * arr
         return arr, factor
 
 
@@ -64,6 +84,7 @@ cdef class DenseMultivariateNormal(Distribution):
         cdef Py_ssize_t i
         cdef int info, incx = 1
         cdef double[::1, :] chol = cov
+        cdef np.ndarray std = np.empty(n)
 
         if not overwrite_cov:
             chol = np.copy(cov, order='F')
@@ -75,7 +96,10 @@ cdef class DenseMultivariateNormal(Distribution):
         if info != 0:
             raise RuntimeError('Cholesky Factorization failed')
 
-        std = self.rng.standard_normal(n)
+        with self.bitgen.lock, nogil:
+            random_standard_normal_fill(
+                self.rng, n, <double*>np.PyArray_DATA(std)
+            )
 
         cdef double[::1] std_v = std
 
@@ -93,8 +117,8 @@ cdef class DenseMultivariateNormal2(Distribution):
     
     cdef DenseMultivariateNormal mvnorm
 
-    def __cinit__(self, seed=None):
-        self.mvnorm = DenseMultivariateNormal(seed)
+    def __cinit__(self, random_state=None):
+        self.mvnorm = DenseMultivariateNormal(random_state)
 
     def rvs(self, double[:] b, double[:, :] prec):
         cdef int n = b.shape[0]
@@ -131,8 +155,8 @@ cdef class FastSumToZeroMultivariateNormal(Distribution):
 
     cdef SparseMultivariateNormal mvnorm
 
-    def __cinit__(self, seed=None):
-        self.mvnorm = SparseMultivariateNormal(seed)
+    def __cinit__(self, random_state=None):
+        self.mvnorm = SparseMultivariateNormal(random_state)
 
     def rvs(self, double[:] b, prec):
         cdef int size = b.shape[0]
@@ -153,8 +177,8 @@ cdef class SlowSumToZeroMultivariateNormal(Distribution):
 
     cdef DenseMultivariateNormal mvnorm
 
-    def __cinit__(self, seed=None):
-        self.mvnorm = DenseMultivariateNormal(seed)
+    def __cinit__(self, random_state=None):
+        self.mvnorm = DenseMultivariateNormal(random_state)
 
     def rvs(self, double[:] b, prec):
         cdef int n = b.shape[0]
@@ -182,8 +206,8 @@ cdef class SlowSumToZeroMultivariateNormal2(Distribution):
 
     cdef DenseMultivariateNormal mvnorm
 
-    def __cinit__(self, seed=None):
-        self.mvnorm = DenseMultivariateNormal(seed)
+    def __cinit__(self, random_state=None):
+        self.mvnorm = DenseMultivariateNormal(random_state)
 
     def rvs(self, double[:] b, prec):
         superlu = splu(prec, permc_spec='MMD_AT_PLUS_A', options=OPTS)
@@ -211,8 +235,8 @@ cdef class SlowSumToZeroMultivariateNormal3(Distribution):
 
     cdef DenseMultivariateNormal mvnorm
 
-    def __cinit__(self, seed=None):
-        self.mvnorm = DenseMultivariateNormal(seed)
+    def __cinit__(self, random_state=None):
+        self.mvnorm = DenseMultivariateNormal(random_state)
 
     def rvs(self, double[:] b, prec, precond=None):
         cdef int size = b.shape[0]
@@ -237,12 +261,19 @@ else:
     SumToZeroMultivariateNormal = SlowSumToZeroMultivariateNormal
 
 
-cdef class PolyaGamma(Distribution):
+cdef class PolyaGamma:
+    cdef object random_state
+    cdef object rng
 
-    def __cinit__(self, seed=None):
-        if seed is None:
-            seed = self.rng.integers(low=0, high=2 ** 63)
-        self.rng = PyPolyaGamma(seed)
+    def __cinit__(self, random_state=None):
+        if random_state is None:
+            rng = np.random.default_rng(random_state)
+            random_state = rng.integers(low=0, high=2 ** 63)
+        self.rng = PyPolyaGamma(random_state)
+        self.random_state = random_state
+
+    def __reduce__(self):
+        return self.__class__, (self.random_state,)
 
     def rvs(self, a, b, double[:] out=None):
         if isinstance(a, Number):
