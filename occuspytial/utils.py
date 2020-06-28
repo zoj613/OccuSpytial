@@ -35,7 +35,7 @@ def make_data(
     max_neighbors=8,
     random_state=None,
  ):
-    rng = np.random.default_rng(random_state)
+    rng = np.random.default_rng(np.random.SFC64(random_state))
 
     if n < 100:
         raise ValueError('n cant be lower than 50')

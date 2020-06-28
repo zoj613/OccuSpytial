@@ -34,6 +34,7 @@ __all__ = (
     'PolyaGamma',
 )
 
+np.import_array()
 
 cdef dict OPTS = {'SymmetricMode': True}
 
@@ -42,9 +43,10 @@ cdef class Distribution:
     cdef object random_state
     cdef object bitgen
     cdef bitgen_t* rng
+    cdef object lock
 
     def __cinit__(self, random_state=None):
-        self.bitgen = np.random.PCG64(random_state)
+        self.bitgen = np.random.SFC64(random_state)
         cdef const char* capsule_name = 'BitGenerator'
         capsule = self.bitgen.capsule
 
@@ -53,6 +55,7 @@ cdef class Distribution:
 
         self.rng = <bitgen_t*>PyCapsule_GetPointer(capsule, capsule_name)
         self.random_state = random_state
+        self.lock = self.bitgen.lock
 
     def __reduce__(self):
         return self.__class__, (self.random_state,)
@@ -68,7 +71,7 @@ cdef class SparseMultivariateNormal(Distribution):
         L = factor.L()
         chol = factor.apply_Pt(L)
 
-        with self.bitgen.lock, nogil:
+        with self.lock, nogil:
             random_standard_normal_fill(
                 self.rng, size, <double*>np.PyArray_DATA(arr)
             )
@@ -96,7 +99,7 @@ cdef class DenseMultivariateNormal(Distribution):
         if info != 0:
             raise RuntimeError('Cholesky Factorization failed')
 
-        with self.bitgen.lock, nogil:
+        with self.lock, nogil:
             random_standard_normal_fill(
                 self.rng, n, <double*>np.PyArray_DATA(std)
             )
@@ -267,7 +270,7 @@ cdef class PolyaGamma:
 
     def __cinit__(self, random_state=None):
         if random_state is None:
-            rng = np.random.default_rng(random_state)
+            rng = np.random.default_rng(np.random.SFC64(random_state))
             random_state = rng.integers(low=0, high=2 ** 63)
         self.rng = PyPolyaGamma(random_state)
         self.random_state = random_state

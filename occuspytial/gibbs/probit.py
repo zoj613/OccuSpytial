@@ -104,7 +104,7 @@ class ProbitRSRGibbs(GibbsBase):
 
     def _update_tau(self):
         eta = self.state.eta
-        rate = 0.5 * eta @ (self.fixed.Q * eta) + self.fixed.tau_rate
+        rate = 0.5 * eta @ self.fixed.Q @ eta + self.fixed.tau_rate
         self.state.tau = self.rng.gamma(self.fixed.tau_shape, 1 / rate)
 
     def _update_eps(self):
