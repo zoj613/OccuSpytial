@@ -3,6 +3,11 @@ import warnings
 import numpy as np
 
 
+def get_generator(random_state):
+    bitgenerator = np.random.SFC64(random_state)
+    return np.random.default_rng(bitgenerator)
+
+
 def rand_precision_mat(lat_row, lat_col, max_neighbors=8, rho=1):
     if max_neighbors == 8:
         nn = 'queen'
@@ -35,7 +40,7 @@ def make_data(
     max_neighbors=8,
     random_state=None,
  ):
-    rng = np.random.default_rng(np.random.SFC64(random_state))
+    rng = get_generator(random_state)
 
     if n < 100:
         raise ValueError('n cant be lower than 50')

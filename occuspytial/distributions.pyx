@@ -27,6 +27,9 @@ except ImportError:
     )
     USE_SKSPARSE = False
 
+from .utils import get_generator
+
+
 __all__ = (
     'SumToZeroMultivariateNormal',
     'SparseMultivariateNormal',
@@ -113,7 +116,6 @@ cdef class DenseMultivariateNormal(Distribution):
                 std_v[i] += mean[i]
 
         return std, chol
-
 
 
 cdef class DenseMultivariateNormal2(Distribution):
@@ -270,7 +272,7 @@ cdef class PolyaGamma:
 
     def __cinit__(self, random_state=None):
         if random_state is None:
-            rng = np.random.default_rng(np.random.SFC64(random_state))
+            rng = get_generator(random_state)
             random_state = rng.integers(low=0, high=2 ** 63)
         self.rng = PyPolyaGamma(random_state)
         self.random_state = random_state
