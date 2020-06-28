@@ -29,7 +29,7 @@ class GibbsBase(ABC):
         self.y = Data(y)
         self.chain = None
         self.random_state = random_state
-        self.rng = np.random.default_rng(random_state)
+        self.rng = np.random.default_rng(np.random.SFC64(random_state))
 
     @abstractmethod
     def step(self):
@@ -188,5 +188,6 @@ class GibbsBase(ABC):
         out = type(self).__new__(self.__class__)
         out.__dict__.update(self.__dict__)
         # make sure the copy has its own unique random number generator
-        out.__dict__['rng'] = np.random.default_rng()
+        bitgen = np.random.SFC64(self.rng.integers(low=0, high=2 ** 63))
+        out.__dict__['rng'] = np.random.default_rng(bitgen)
         return out
