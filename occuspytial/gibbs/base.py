@@ -9,6 +9,7 @@ from tqdm import tqdm
 from ..chain import Chain
 from ..data import Data
 from ..posterior import PosteriorParameter
+from ..utils import get_generator
 
 from .parallel import sample_parallel
 from .state import State, FixedState
@@ -29,7 +30,7 @@ class GibbsBase(ABC):
         self.y = Data(y)
         self.chain = None
         self.random_state = random_state
-        self.rng = np.random.default_rng(np.random.SFC64(random_state))
+        self.rng = get_generator(random_state)
 
     @abstractmethod
     def step(self):
@@ -190,6 +191,6 @@ class GibbsBase(ABC):
         out = type(self).__new__(self.__class__)
         out.__dict__.update(self.__dict__)
         # make sure the copy has its own unique random number generator
-        bitgen = np.random.SFC64(self.rng.integers(low=0, high=2 ** 63))
-        out.__dict__['rng'] = np.random.default_rng(bitgen)
+        random_state = self.rng.integers(low=0, high=2 ** 63)
+        out.__dict__['rng'] = get_generator(random_state)
         return out
