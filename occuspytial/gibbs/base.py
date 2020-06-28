@@ -53,7 +53,9 @@ class GibbsBase(ABC):
         self.fixed.not_surveyed = [
             site for site in range(self.fixed.n) if site not in self.y.surveyed
         ]
+        self.fixed.n_ns = len(self.fixed.not_surveyed)
         self.fixed.not_obs = [i for i in self.y.surveyed if not self.state.z[i]]
+        self.fixed.n_no = len(self.fixed.not_obs)
         self.fixed.obs = [i for i in self.y.surveyed if self.state.z[i]]
         self.fixed.W_not_obs = self.W[self.fixed.not_obs]
         self.fixed.visits_not_obs = self.W.visits(self.fixed.not_obs)
