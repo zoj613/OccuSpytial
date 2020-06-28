@@ -77,7 +77,9 @@ class LogitICARGibbs(GibbsBase):
 
     def _update_z(self):
         no = self.fixed.not_obs
+        n_no = self.fixed.n_no
         ns = self.fixed.not_surveyed
+        n_ns = self.fixed.n_ns
         beta = self.state.beta
         spat = self.state.spatial
 
@@ -89,12 +91,12 @@ class LogitICARGibbs(GibbsBase):
         x = y + self.state.section_sums
         c = -np.logaddexp(0, xb_eta)
         logp = x - np.logaddexp(c, x)
-        self.state.z[no] = self.rng.binomial(n=1, p=np.exp(logp))
+        self.state.z[no] = np.log(self.rng.uniform(size=n_no)) < logp
 
         if ns:
             xb_eta_ns = self.X[ns] @ beta + spat[ns]
             logp = -np.logaddexp(0, -xb_eta_ns)
-            self.state.z[ns] = self.rng.binomial(n=1, p=np.exp(logp))
+            self.state.z[ns] = np.log(self.rng.uniform(size=n_ns)) < logp
 
         self.state.k = self.state.z - 0.5
 

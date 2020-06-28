@@ -136,7 +136,9 @@ class ProbitRSRGibbs(GibbsBase):
 
     def _update_z(self):
         no = self.fixed.not_obs
+        n_no = self.fixed.n_no
         ns = self.fixed.not_surveyed
+        n_ns = self.fixed.n_ns
         beta = self.state.beta
         K_eta = self.state.spatial
         xb_eta = self.X[no] @ beta + K_eta[no] + self.state.eps[no]
@@ -154,11 +156,11 @@ class ProbitRSRGibbs(GibbsBase):
         lognum = lognum1 + self.state.section_sums
         prod_sf = np.exp(self.state.section_sums)
         logp = lognum - np.log(1 - num1 + num1 * prod_sf)
-        self.state.z[no] = self.rng.binomial(n=1, p=np.exp(logp))
+        self.state.z[no] = np.log(self.rng.uniform(size=n_no)) < logp
 
         if ns:
             p = ndtr(self.X[ns] @ beta + K_eta[ns] + self.state.eps[ns])
-            self.state.z[ns] = self.rng.binomial(n=1, p=p)
+            self.state.z[ns] = self.rng.uniform(size=n_ns) < p
 
     def step(self):
         self._update_omega_b()
