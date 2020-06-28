@@ -22,7 +22,7 @@ class ProbitRSRGibbs(GibbsBase):
         self.state.omega_b = np.zeros(self.fixed.n)
         self.fixed.XTX_plus_bprec = self.X.T @ self.X + self.fixed.b_prec
         self.fixed.eps_chol_factor = np.ones(self.X.shape[0]) / np.sqrt(2)
-        self.dists.mvnorm = DenseMultivariateNormal2()
+        self.dists.mvnorm = DenseMultivariateNormal2(self.random_state)
 
         # XTX_i = inv(self.X.T @ self.X)
         chol = np.linalg.cholesky(self.X.T @ self.X)
@@ -104,7 +104,7 @@ class ProbitRSRGibbs(GibbsBase):
 
     def _update_tau(self):
         eta = self.state.eta
-        rate = (0.5 * eta @ self.fixed.Q @ eta) + self.fixed.tau_rate
+        rate = 0.5 * eta @ (self.fixed.Q * eta) + self.fixed.tau_rate
         self.state.tau = self.rng.gamma(self.fixed.tau_shape, 1 / rate)
 
     def _update_eps(self):
