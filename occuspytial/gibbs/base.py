@@ -16,7 +16,7 @@ from .state import State, FixedState
 
 
 class _GibbsState(State):
-    _posterior_names = ('alpha', 'beta', 'tau', 'z', 'eta')
+    _posterior_names = ('alpha', 'beta', 'tau')
 
     @property
     def posteriors(self):
@@ -126,8 +126,6 @@ class GibbsBase(ABC):
         chain_params = {
             'alpha': self.state.alpha.size,
             'beta':  self.state.beta.size,
-            'eta':  self.state.eta.size,
-            'z':  self.fixed.n,
             'tau': 1
         }
         self.chain = Chain(chain_params, size - burnin)
