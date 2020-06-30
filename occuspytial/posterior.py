@@ -5,35 +5,18 @@ az.style.use("arviz-darkgrid")
 
 
 class PosteriorParameter:
-    _exclude = ('z', 'eta')
 
     def __init__(self, *chains):
         self.data = self._create_inference_data(chains)
 
     def _create_inference_data(self, chains):
-        self._excluded = dict.fromkeys(self._exclude)
         if len(chains) > 1:
             data = {
                 name: np.stack([c[name] for c in chains])
                 for name in chains[0]._names
-                if name not in self._exclude
-            }
-            self._excluded = {
-                name: np.stack([c[name] for c in chains])
-                for name in chains[0]._names
-                if name in self._exclude
             }
         else:
-            data = {
-                name: chains[0][name][None, :]
-                for name in chains[0]._names
-                if name not in self._exclude
-            }
-            self._excluded = {
-                name: chains[0][name][None, :]
-                for name in chains[0]._names
-                if name in self._exclude
-            }
+            data = {name: chains[0][name][None] for name in chains[0]._names}
 
         return az.convert_to_inference_data(data).posterior
 
