@@ -88,19 +88,29 @@ class ProbitRSRGibbs(GibbsBase):
         obs_mask = (self.y[self.state.exists] == 1)
         self.state.W = self.W[self.state.exists]
         loc = self.state.W @ self.state.alpha
+        random_state = self.rng.integers(low=0, high=2 ** 32 - 1)
         self.state.omega_a = np.zeros_like(loc)
         a = loc[obs_mask]
-        self.state.omega_a[obs_mask] = truncnorm(-a, np.inf, loc=a).rvs()
+        self.state.omega_a[obs_mask] = truncnorm(-a, np.inf, loc=a).rvs(
+            random_state=random_state
+        )
         b = loc[~obs_mask]
-        self.state.omega_a[~obs_mask] = truncnorm(-np.inf, -b, loc=b).rvs()
+        self.state.omega_a[~obs_mask] = truncnorm(-np.inf, -b, loc=b).rvs(
+            random_state=random_state
+        )
 
     def _update_omega_b(self):
         loc = self.X @ self.state.beta + self.state.spatial + self.state.eps
         exist_mask = (self.state.z == 1)
+        random_state = self.rng.integers(low=0, high=2 ** 32 - 1)
         a = loc[exist_mask]
-        self.state.omega_b[exist_mask] = truncnorm(-a, np.inf, loc=a).rvs()
+        self.state.omega_b[exist_mask] = truncnorm(-a, np.inf, loc=a).rvs(
+            random_state=random_state
+        )
         b = loc[~exist_mask]
-        self.state.omega_b[~exist_mask] = truncnorm(-np.inf, -b, loc=b).rvs()
+        self.state.omega_b[~exist_mask] = truncnorm(-np.inf, -b, loc=b).rvs(
+            random_state=random_state
+        )
 
     def _update_tau(self):
         eta = self.state.eta
