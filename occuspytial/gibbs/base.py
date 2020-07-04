@@ -81,7 +81,7 @@ class GibbsBase(ABC):
 
     def _set_hyperparams(self, params, hyperparams):
         for key, value in hyperparams.items():
-            params[key] = value
+            setattr(params, key, value)
         return params
 
     def _set_default_hyperparams(self, params):
