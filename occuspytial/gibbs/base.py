@@ -139,19 +139,21 @@ class GibbsBase(ABC):
 
         return self.chain
 
-    def sample(
-        self, size, burnin=0, start=None, chains=1, progressbar=True, pos=0
-    ):
+    def sample(self, size, burnin=0, start=None, chains=1, progressbar=True):
         if burnin >= size:
             raise ValueError('burnin value cannot be larger than sample size')
         if chains < 1:
             raise ValueError('chains must a postive integer.')
 
         samples = sample_parallel(
-            self, size=size, burnin=burnin, chains=chains, start=start
+            self,
+            size=size,
+            burnin=burnin,
+            chains=chains,
+            start=start,
+            progressbar=progressbar
         )
-        out = PosteriorParameter(*samples)
-        return out
+        return PosteriorParameter(*samples)
 
     def resample(self, chain, size):
         # TODO: clean this up and improve efficiency
