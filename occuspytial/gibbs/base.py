@@ -155,38 +155,6 @@ class GibbsBase(ABC):
         )
         return PosteriorParameter(*samples)
 
-    def resample(self, chain, size):
-        # TODO: clean this up and improve efficiency
-        if not isinstance(chain, PosteriorParameter):
-            raise ValueError(
-                '"chain" needs to be an instance of PosteriorParameter'
-            )
-        chain = deepcopy(chain)
-        out = chain.data.pad(
-            pad_width={'draw': (0, size)}, mode='constant', constant_values=0
-        )
-        out['draw'] = np.arange(out.draw.size)
-        # pad the exluded params
-        for key in chain._excluded:
-            chain._excluded[key] = np.pad(
-                chain._excluded[key], [(0, 0), (0, size), (0, 0)]
-            )
-        for i in range(len(chain.data.chain)):
-            start = {
-                key: val[i][-(size + 1)]
-                for key, val in chain._excluded.items()
-            }
-            start.update({
-                k: chain[k][i][-1] for k in chain.data.keys()
-            })
-            new_chain = self.sample(size, burnin=0, start=start)
-            for key in chain.data.keys():
-                out[key].data[i][-size:] = new_chain[key]
-            for key, val in chain._excluded.items():
-                chain._excluded[key][i][-size:] = new_chain._excluded[key][0]
-        chain.data = out
-        return chain
-
     def copy(self):
         out = type(self).__new__(self.__class__)
         out.__dict__.update(self.__dict__)
