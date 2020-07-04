@@ -112,9 +112,9 @@ class LogitICARGibbs(GibbsBase):
 
 class LogitRSRGibbs(LogitICARGibbs):
     def __init__(
-        self, Q, W, X, y, hparam=None, random_state=None, r=0.5, q=None,
+        self, Q, W, X, y, hparams=None, random_state=None, r=0.5, q=None,
     ):
-        super().__init__(Q, W, X, y, hparam, random_state)
+        super().__init__(Q, W, X, y, hparams, random_state)
         self._configure_rsr(r, q)
 
     def _configure_rsr(self, r, q):
