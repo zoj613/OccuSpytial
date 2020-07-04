@@ -79,7 +79,7 @@ def make_data(
     row = rng.choice(factors)
     col = n // row
 
-    Q = rand_precision_mat(row, col, max_neighbors=max_neighbors)
+    Q = rand_precision_mat(row, col, max_neighbors=max_neighbors).astype(float)
     Q_pinv = np.linalg.pinv(Q.toarray())
     eta = rng.multivariate_normal(np.zeros(n), Q_pinv / tau, method='cholesky')
 
