@@ -29,6 +29,9 @@ def test_random_precision_mat():
     mat = rand_precision_mat(2, 4, max_neighbors=8)
     assert mat.diagonal().max() == 5
 
+    with pytest.raises(ValueError, match='neighbors should be one of {4, 8}'):
+        rand_precision_mat(2, 4, max_neighbors=9)
+
     # test if output is a singular matrix (i.e rank is (n - 1))
     assert np.linalg.matrix_rank(mat.toarray()) == 7
 
@@ -48,11 +51,17 @@ def test_make_data():
     assert data[2].shape[1] == 3
     assert len(data[1]) == 65
 
+    data = make_data(n=150, p=3, q=2, random_state=10)
+    assert len(data[1]) == 150 // 2
+
     with pytest.raises(ValueError, match='n cant be lower than'):
         make_data(n=149)
 
     with pytest.raises(ValueError, match='min_v needs to be at least'):
         make_data(min_v=0)
+
+    with pytest.raises(ValueError, match='max_v is too small'):
+        make_data(n=150, max_v=1)
 
     with pytest.raises(ValueError, match='max_v cant be more than n'):
         make_data(n=150, max_v=151)

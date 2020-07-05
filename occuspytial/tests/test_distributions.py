@@ -3,9 +3,8 @@ import pytest
 from scipy.sparse import diags
 try:
     from sksparse.cholmod import Factor
-    HAS_SKSPARSE = True
 except ImportError:
-    HAS_SKSPARSE = False
+    pass
 
 from occuspytial.distributions import (
     FastSumToZeroMultivariateNormal,
@@ -13,14 +12,16 @@ from occuspytial.distributions import (
     SparseMultivariateNormal,
     DenseMultivariateNormal,
     PolyaGamma,
+    USE_SKSPARSE
 )
 
 skip_if_no_skparse = pytest.mark.skipif(
-    not HAS_SKSPARSE, reason='scikit-sparse is not installed'
+    not USE_SKSPARSE, reason='scikit-sparse is not installed'
 )
 
 
 @skip_if_no_skparse
+@pytest.mark.filterwarnings('ignore')
 def test_sparse_mvnorm():
     d = SparseMultivariateNormal()
     cov = diags(np.random.rand(10), format='csc')

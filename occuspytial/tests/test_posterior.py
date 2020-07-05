@@ -6,6 +6,7 @@ from occuspytial.chain import Chain
 from occuspytial.posterior import PosteriorParameter
 
 
+@pytest.mark.filterwarnings('ignore::UserWarning')
 def test_posterior():
     c = Chain({'p1':  2, 'p2': 1}, size=2)
     p = PosteriorParameter(c)
@@ -32,4 +33,4 @@ def test_posterior():
     with pytest.raises(KeyError):
         c['p3']
 
-    c['p1']
+    assert c['p1'].shape == (0, 2)

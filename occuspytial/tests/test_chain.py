@@ -25,3 +25,5 @@ def test_chain():
     assert np.all(c['p1'] == [[1, 2], [1, 2]])
     with pytest.raises(KeyError):
         c['p3']
+
+    assert repr(c) == "Chain(params: ('p1', 'p2'), size: 2)"
