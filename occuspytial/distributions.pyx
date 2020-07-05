@@ -15,7 +15,6 @@ from numpy.random.c_distributions cimport random_standard_normal_fill
 from pypolyagamma import PyPolyaGamma
 from scipy.linalg.cython_blas cimport dtrmv, dtrsv
 from scipy.linalg.cython_lapack cimport dpotrf
-from scipy.sparse.linalg import splu, cg
 try:
     from sksparse.cholmod import cholesky as sparse_cholesky
     USE_SKSPARSE = True
@@ -204,59 +203,6 @@ cdef class SlowSumToZeroMultivariateNormal(Distribution):
             dtrsv('U', 'N', 'N', &n, &chol_v[0, 0], &n, &z[0], &incx)
 
         scale_arr(x, z, x, n)
-        return s
-
-
-cdef class SlowSumToZeroMultivariateNormal2(Distribution):
-
-    cdef DenseMultivariateNormal mvnorm
-
-    def __cinit__(self, random_state=None):
-        self.mvnorm = DenseMultivariateNormal(random_state)
-
-    def rvs(self, double[:] b, prec):
-        superlu = splu(prec, permc_spec='MMD_AT_PLUS_A', options=OPTS)
-        cdef int size = b.shape[0]
-        cdef double[:, :] xz
-        cdef double[:] x, z
-        
-        prec_d = prec.toarray(order='F')
-        cdef double[::1, :] prec_d_v = prec_d
-        s, _ = self.mvnorm.rvs(b, prec_d_v)
-        cdef double[:] s_v = s
-
-        prec_d_v[:, 0] = s_v
-        prec_d_v[:, 1] = 1
-        rhs = prec_d[:, :2]
-        xz = superlu.solve(rhs)
-        x = xz[:, 0]
-        z = xz[:, 1]
-
-        scale_arr(x, z, s_v, size)
-        return s
-
-
-cdef class SlowSumToZeroMultivariateNormal3(Distribution):
-
-    cdef DenseMultivariateNormal mvnorm
-
-    def __cinit__(self, random_state=None):
-        self.mvnorm = DenseMultivariateNormal(random_state)
-
-    def rvs(self, double[:] b, prec, precond=None):
-        cdef int size = b.shape[0]
-        cdef double[:] x, z
-
-        prec_d = prec.toarray(order='F')
-        cdef double[::1, :] prec_d_v = prec_d
-        s, _ = self.mvnorm.rvs(b, prec_d_v)
-        cdef double[:] s_v = s
-
-        prec_d_v[:, 0] = 1
-        x = cg(prec, s, M=precond)[0]
-        z = cg(prec, prec_d[:, 0], M=precond)[0]
-
-        scale_arr(x, z, s_v, size)
         return s
 
 
