@@ -1,6 +1,3 @@
-from abc import ABC, abstractmethod
-from copy import deepcopy
-
 import numpy as np
 from scipy.sparse import csc_matrix, isspmatrix_csc
 from scipy.sparse.linalg import eigsh
@@ -23,7 +20,7 @@ class _GibbsState(State):
         return {key: self.__dict__[key] for key in self._posterior_names}
 
 
-class GibbsBase(ABC):
+class GibbsBase:
     def __init__(self, Q, W, X, y, hparams=None, random_state=None):
         self.W = Data(W)
         self.X = X
@@ -32,9 +29,8 @@ class GibbsBase(ABC):
         self.random_state = random_state
         self.rng = get_generator(random_state)
 
-    @abstractmethod
     def step(self):
-        pass
+        raise NotImplementedError
 
     def _configure(self, Q, hparams, verify_precision=True, **kwargs):
         if verify_precision:
@@ -143,7 +139,7 @@ class GibbsBase(ABC):
         if burnin >= size:
             raise ValueError('burnin value cannot be larger than sample size')
         if chains < 1:
-            raise ValueError('chains must a postive integer.')
+            raise ValueError('chains must a positive integer.')
 
         samples = sample_parallel(
             self,
