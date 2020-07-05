@@ -60,9 +60,11 @@ class ProbitRSRGibbs(GibbsBase):
         del self.fixed.Q
         self.fixed.Q = K.T @ Q_copy @ K
         self.fixed.K = K
-        # `_set_default_hyperparams` has been called so modify tau_shape
-        del self.fixed.tau_shape
-        self.fixed.tau_shape = 0.5 + 0.5 * self.fixed.q
+
+        if not hparams:
+            # `_set_default_hyperparams` has been called so modify tau_shape
+            del self.fixed.tau_shape
+            self.fixed.tau_shape = 0.5 + 0.5 * self.fixed.q
 
     def _initialize_default_start(self, state):
         state = super()._initialize_default_start(state)
