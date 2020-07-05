@@ -20,13 +20,11 @@ class LogitICARGibbs(GibbsBase):
         self._configure(Q, hparams, pertub)
 
     def _configure(self, Q, hparams, pertub):
-        super()._configure(Q, hparams, verify_precision=False)
+        super()._configure(Q, hparams)
 
-        smallest_2_eigs = eigsh(Q, k=2, which='SA', return_eigenvectors=False)
-        if smallest_2_eigs[1] >= 1e-4:
-            raise ValueError('Spatial precision matrix Q must be singular.')
         if pertub is None:
-            self.fixed.pertub = smallest_2_eigs[0]
+            least_2_eigs = eigsh(Q, k=2, which='SA', return_eigenvectors=False)
+            self.fixed.pertub = least_2_eigs[0]
         else:
             self.fixed.pertub = pertub
 
@@ -112,12 +110,12 @@ class LogitICARGibbs(GibbsBase):
 
 class LogitRSRGibbs(LogitICARGibbs):
     def __init__(
-        self, Q, W, X, y, hparam=None, random_state=None, r=0.5, q=None,
+        self, Q, W, X, y, hparams=None, random_state=None, r=0.5, q=None,
     ):
-        super().__init__(Q, W, X, y, hparam, random_state)
-        self._configure_rsr(r, q)
+        super().__init__(Q, W, X, y, hparams, random_state)
+        self._configure_rsr(r, q, hparams)
 
-    def _configure_rsr(self, r, q):
+    def _configure_rsr(self, r, q, hparams):
         # XTX_i = inv(self.X.T @ self.X)
         chol = np.linalg.cholesky(self.X.T @ self.X)
         z = solve_triangular(chol, np.eye(self.X.shape[1]), lower=True)
@@ -156,9 +154,10 @@ class LogitRSRGibbs(LogitICARGibbs):
         del self.fixed.Q
         self.fixed.Q = K.T @ Q_copy @ K
         self.fixed.K = K
-        # `_set_default_hyperparams` has been called so modify tau_shape
-        del self.fixed.tau_shape
-        self.fixed.tau_shape = 0.5 + 0.5 * self.fixed.q
+        if not hparams:
+            # `_set_default_hyperparams` has been called so modify tau_shape
+            del self.fixed.tau_shape
+            self.fixed.tau_shape = 0.5 + 0.5 * self.fixed.q
 
     def _initialize_default_start(self, state):
         state = super()._initialize_default_start(state)

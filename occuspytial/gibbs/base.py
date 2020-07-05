@@ -1,6 +1,3 @@
-from abc import ABC, abstractmethod
-from copy import deepcopy
-
 import numpy as np
 from scipy.sparse import csc_matrix, isspmatrix_csc
 from scipy.sparse.linalg import eigsh
@@ -23,7 +20,7 @@ class _GibbsState(State):
         return {key: self.__dict__[key] for key in self._posterior_names}
 
 
-class GibbsBase(ABC):
+class GibbsBase:
     def __init__(self, Q, W, X, y, hparams=None, random_state=None):
         self.W = Data(W)
         self.X = X
@@ -32,9 +29,8 @@ class GibbsBase(ABC):
         self.random_state = random_state
         self.rng = get_generator(random_state)
 
-    @abstractmethod
     def step(self):
-        pass
+        raise NotImplementedError
 
     def _configure(self, Q, hparams, verify_precision=True, **kwargs):
         if verify_precision:
@@ -81,7 +77,7 @@ class GibbsBase(ABC):
 
     def _set_hyperparams(self, params, hyperparams):
         for key, value in hyperparams.items():
-            params[key] = value
+            setattr(params, key, value)
         return params
 
     def _set_default_hyperparams(self, params):
@@ -139,51 +135,21 @@ class GibbsBase(ABC):
 
         return self.chain
 
-    def sample(
-        self, size, burnin=0, start=None, chains=1, progressbar=True, pos=0
-    ):
+    def sample(self, size, burnin=0, start=None, chains=1, progressbar=True):
         if burnin >= size:
             raise ValueError('burnin value cannot be larger than sample size')
         if chains < 1:
-            raise ValueError('chains must a postive integer.')
+            raise ValueError('chains must a positive integer.')
 
         samples = sample_parallel(
-            self, size=size, burnin=burnin, chains=chains, start=start
+            self,
+            size=size,
+            burnin=burnin,
+            chains=chains,
+            start=start,
+            progressbar=progressbar
         )
-        out = PosteriorParameter(*samples)
-        return out
-
-    def resample(self, chain, size):
-        # TODO: clean this up and improve efficiency
-        if not isinstance(chain, PosteriorParameter):
-            raise ValueError(
-                '"chain" needs to be an instance of PosteriorParameter'
-            )
-        chain = deepcopy(chain)
-        out = chain.data.pad(
-            pad_width={'draw': (0, size)}, mode='constant', constant_values=0
-        )
-        out['draw'] = np.arange(out.draw.size)
-        # pad the exluded params
-        for key in chain._excluded:
-            chain._excluded[key] = np.pad(
-                chain._excluded[key], [(0, 0), (0, size), (0, 0)]
-            )
-        for i in range(len(chain.data.chain)):
-            start = {
-                key: val[i][-(size + 1)]
-                for key, val in chain._excluded.items()
-            }
-            start.update({
-                k: chain[k][i][-1] for k in chain.data.keys()
-            })
-            new_chain = self.sample(size, burnin=0, start=start)
-            for key in chain.data.keys():
-                out[key].data[i][-size:] = new_chain[key]
-            for key, val in chain._excluded.items():
-                chain._excluded[key][i][-size:] = new_chain._excluded[key][0]
-        chain.data = out
-        return chain
+        return PosteriorParameter(*samples)
 
     def copy(self):
         out = type(self).__new__(self.__class__)

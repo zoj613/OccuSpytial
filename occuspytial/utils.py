@@ -30,7 +30,7 @@ def rand_precision_mat(lat_row, lat_col, max_neighbors=8, rho=1):
 
 
 def make_data(
-    n=100,
+    n=150,
     min_v=None,
     max_v=None,
     ns=None,
@@ -42,8 +42,8 @@ def make_data(
  ):
     rng = get_generator(random_state)
 
-    if n < 100:
-        raise ValueError('n cant be lower than 50')
+    if n < 150:
+        raise ValueError('n cant be lower than 150')
 
     if min_v is None:
         min_v = 2
@@ -53,9 +53,9 @@ def make_data(
     if max_v is None:
         max_v = n // 10
     elif max_v < 2:
-        raise ValueError('v is too small')
+        raise ValueError('max_v is too small')
     elif max_v > n:
-        raise ValueError('v cant be more than n')
+        raise ValueError('max_v cant be more than n')
 
     if ns is None:
         ns = n // 2
@@ -64,7 +64,7 @@ def make_data(
     elif ns > n:
         raise ValueError('ns cant be more than n')
 
-    surveyed_sites = rng.choice(range(n), size=ns)
+    surveyed_sites = rng.choice(range(n), size=ns, replace=False)
     visits_per_site = rng.integers(min_v, max_v, size=ns, endpoint=True)
 
     alpha = rng.standard_normal(q)
@@ -79,7 +79,7 @@ def make_data(
     row = rng.choice(factors)
     col = n // row
 
-    Q = rand_precision_mat(row, col, max_neighbors=max_neighbors)
+    Q = rand_precision_mat(row, col, max_neighbors=max_neighbors).astype(float)
     Q_pinv = np.linalg.pinv(Q.toarray())
     eta = rng.multivariate_normal(np.zeros(n), Q_pinv / tau, method='cholesky')
 
