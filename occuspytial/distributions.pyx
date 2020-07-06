@@ -40,6 +40,11 @@ np.import_array()
 
 
 cdef class Distribution:
+    """Base class to serve as an informal interface for distributions.
+
+    Implementations can inherit from this class, so it should never be used
+    directly.
+    """
     cdef object random_state
     cdef object bitgen
     cdef bitgen_t* rng
@@ -62,8 +67,39 @@ cdef class Distribution:
 
 
 cdef class SparseMultivariateNormal(Distribution):
+    """Multivariate Gaussian distribution for sparse covariance matrices.
 
+    Parameters
+    ----------
+    random_state : {None, int, numpy.random.SeedSequence}
+        A seed to initialize the random number generator. Defaults to None.
+
+    Methods
+    -------
+    rvs(mean, cov)
+    """
     cpdef tuple rvs(self, np.ndarray mean, cov):
+        """
+        rvs(self, mean, cov)
+
+        Generate a random draw from this distribution.
+        
+        Parameters
+        ----------
+        mean : np.ndarray
+            Mean of the distribution
+        cov : scipy's sparse matrix format
+            Covariance matrix of the distribution.
+
+        Returns
+        -------
+        out : np.ndarray
+            A random sample from a multivariate Gaussian with mean vector
+            and covariance specified by `mean` and `cov`.
+        factor : sksparse.cholmod.Factor
+            The cholesky factor object of the covariance matrix.
+
+        """
         cdef:
             np.npy_intp* dims = np.PyArray_DIMS(mean)
             np.npy_intp size = np.PyArray_SIZE(mean)
@@ -82,8 +118,45 @@ cdef class SparseMultivariateNormal(Distribution):
 
 
 cdef class DenseMultivariateNormal(Distribution):
+    """Multivariate Gaussian distribution for dense covariance matrices.
 
+    Parameters
+    ----------
+    random_state : {None, int, numpy.random.SeedSequence}
+        A seed to initialize the random number generator. Defaults to None.
+
+    Methods
+    -------
+    rvs(mean, cov, overwrite_cov=True)
+    """
     cpdef tuple rvs(self, np.ndarray mean, cov, bint overwrite_cov=True):
+        """
+        rvs(mean, cov, overwrite_cov=True)
+
+        Generate a random sample from a multivariate Gaussian distribution.
+        
+        Parameters
+        ----------
+        mean : np.ndarray
+            Mean of the distribution
+        cov : np.ndarray
+            Covariance matrix of the distribution.
+        overwrite_cov : bool
+            Whether to write over the `cov` array when computing the cholesky
+            factor instead of creating a new array. Defaults to True.
+
+        Returns
+        -------
+        out : np.ndarray
+            A random sample from a multivariate Gaussian with mean vector
+            and covariance specified by `mean` and `cov`.
+        factor : np.ndarray
+            The cholesky factor of the covariance matrix :math:`\mathbf{U}`
+            such that :math:`\mathbf{U^TU} = \mathbf{A}`. All the data is in
+            the upper triangular part of the array, The lower triangular part
+            of the array is garbage values.
+
+        """
         cdef:
             Py_ssize_t i
             np.ndarray chol_arr
@@ -123,13 +196,51 @@ cdef class DenseMultivariateNormal(Distribution):
 
 
 cdef class DenseMultivariateNormal2(Distribution):
-    
+    """Multivariate Gaussian distribution for dense precision matrices.
+
+    The Guassian distribution is of the form
+
+    .. math::
+
+        \mathcal{N}(\mathbf{\Lambda}^{-1}\mathbf{b}, \mathbf{\Lambda}^{-1})
+
+    In most cases only :math:`\mathbf{\Lambda}` and :math:`\mathbf{b}` are
+    available. This class facilitates sampling from a Gaussian of this form.
+
+    Parameters
+    ----------
+    random_state : {None, int, numpy.random.SeedSequence}
+        A seed to initialize the random number generator. Defaults to None.
+
+    Methods
+    -------
+    rvs(mean, prec)
+    """
     cdef DenseMultivariateNormal mvnorm
 
     def __cinit__(self, random_state=None):
         self.mvnorm = DenseMultivariateNormal(random_state)
 
     def rvs(self, np.ndarray b, prec):
+        """
+        rvs(mean, prec)
+
+        Generate a random draw from this distribution.
+
+        Parameters
+        ----------
+        b : np.ndarray
+            The :math:`b` component of the distribution's mean.
+        prec : np.ndarray
+            The precision matrix of the distribution (inverse of the covariance
+            matrix).
+
+        Returns
+        -------
+        out : np.ndarray
+            A random variable from this distribution.
+
+        """
         cdef:
             int n = <int>np.PyArray_SIZE(b)
             int incx = 1
@@ -166,13 +277,66 @@ cdef void scale_arr(double[:] x, double[:] z, double[:] out, int size) nogil:
 
 
 cdef class FastSumToZeroMultivariateNormal(Distribution):
+    """Multivariate Gaussian distribution truncated on a hyperplane.
 
+    This class represents a multivariate Gaussian of the form:
+
+    .. math::
+
+        \mathcal{N}(\mathbf{\Lambda}^{-1}\mathbf{b}, \mathbf{\Lambda}^{-1}),
+
+    truncated on the hyperplane :math:`\mathbf{1}^T\mathbf{x} = \mathbf{0}`
+
+    In most cases only :math:`\mathbf{\Lambda}` and :math:`\mathbf{b}` are
+    available. This class facilitates sampling from a Gaussian of this form.
+
+    Parameters
+    ----------
+    random_state : {None, int, numpy.random.SeedSequence}
+        A seed to initialize the random number generator. Defaults to None.
+
+    Methods
+    -------
+    rvs(mean, prec)
+    """  
     cdef SparseMultivariateNormal mvnorm
 
     def __cinit__(self, random_state=None):
         self.mvnorm = SparseMultivariateNormal(random_state)
 
     def rvs(self, np.ndarray b, prec):
+        """
+        rvs(mean, prec)
+
+        Generate a random draw from this distribution.
+
+        Parameters
+        ----------
+        b : np.ndarray
+            The :math:`b` component of the distribution's mean.
+        prec : np.ndarray
+            The precision matrix of the distribution (inverse of the covariance
+            matrix).
+
+        Returns
+        -------
+        out : np.ndarray
+            A random variable from this distribution.
+
+        Notes
+        -----
+        The algorithm implemented here is Algorithm 2 of [1]_ where the
+        :math:`\mathbf{G}` in our case is :math:`\mathbf{1}^T` and
+        :math:`\mathbf{r}` is :math:`\mathbf{0}`.
+
+        References
+        ----------
+        .. [1] Cong, Yulai; Chen, Bo; Zhou, Mingyuan. Fast Simulation of 
+           Hyperplane-Truncated Multivariate Normal Distributions. Bayesian 
+           Anal. 12 (2017), no. 4, 1017--1037. doi:10.1214/17-BA1052. 
+           https://projecteuclid.org/euclid.ba/1488337478
+
+        """
         cdef int size = <int>np.PyArray_SIZE(b)
         cdef double[:] x, z, out_v
 
@@ -188,6 +352,7 @@ cdef class FastSumToZeroMultivariateNormal(Distribution):
 
 
 cdef class SlowSumToZeroMultivariateNormal(Distribution):
+    __doc__ = FastSumToZeroMultivariateNormal.__doc__
 
     cdef DenseMultivariateNormal mvnorm
 
@@ -195,12 +360,17 @@ cdef class SlowSumToZeroMultivariateNormal(Distribution):
         self.mvnorm = DenseMultivariateNormal(random_state)
 
     def rvs(self, np.ndarray b, prec):
+        """
+        rvs(mean, prec)
+
+        See documentation of :func:`FastSumToZeroMultivariateNormal.rvs`
+
+        """
         cdef:
             int n = <int>np.PyArray_SIZE(b)
             int incx = 1
             double[::1, :] prec_v, chol_v
             double[::1] x, z
-
 
         prec_d = prec.toarray(order='F')
         prec_v = prec_d
@@ -229,6 +399,29 @@ else:
 
 
 cdef class PolyaGamma(Distribution):
+    """Polyagamma distribution random sampler.
+
+    This class is facilitates random sampling from a polya-gamma distribution
+
+    .. math:: PG(b,z)
+
+    The implementation wrapped by this class is the one described in [1]_
+
+    Parameters
+    ----------
+    random_state : {None, int}
+        A seed to initialize the random number generator. Defaults to None.
+
+    Methods
+    -------
+    rvs(b, z, out)
+
+    References
+    ----------
+    .. [1]  Windle, J., Polson, N. G., Scott, J. G.,. Sampling Polya-Gamma
+       random variates: alternate and approximate techniques (2014). arXiv 
+       e-prints arXiv:1405.0506.
+    """
     cdef object rng_pg
 
     def __cinit__(self, random_state=None):
@@ -238,15 +431,35 @@ cdef class PolyaGamma(Distribution):
                 random_int = random_positive_int64(self.rng)
         self.rng_pg = PyPolyaGamma(random_int)
 
-    def rvs(self, a, b, double[:] out=None):
+    def rvs(self, b, z, double[:] out=None):
+        """
+        rvs(b, z, out)
+
+        Sample a random draw from a Polya-gamma distribution with parameters
+
+        Parameters
+        ----------
+        b : {np.ndarray, number}
+            The "b" parameter of the :math:`PG(b,z)` distribution.
+        z : {np.ndarray, number}
+            The "z" parameter of the :math:`PG(b,z)` distribution.
+        out : {None, np.ndarray}, optional
+            If provided, the output will be assign to this parameter. This
+            only applies if both `b` and `z` are arrays. Defaults to None.
+
+        Returns
+        -------
+        out : {float, np.ndarray}
+            Polya-gamma random draw.
+        """
         cdef np.npy_intp* dims
 
-        if isinstance(a, Number):
-            return self.rng_pg.pgdraw(a, b)
+        if isinstance(b, Number):
+            return self.rng_pg.pgdraw(b, z)
         elif out is not None:
-            self.rng_pg.pgdrawv(a, b, out)
+            self.rng_pg.pgdrawv(b, z, out)
         else:
-            dims = np.PyArray_DIMS(a)
+            dims = np.PyArray_DIMS(b)
             out_arr = np.PyArray_EMPTY(1, dims, np.NPY_DOUBLE, 0)
-            self.rng_pg.pgdrawv(a, b, out_arr)
+            self.rng_pg.pgdrawv(b, z, out_arr)
             return out_arr

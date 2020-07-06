@@ -2,6 +2,20 @@ from joblib import Parallel, delayed
 
 
 def sample_parallel(class_, **kwargs):
+    """Utility function to perform sampling in parallel.
+
+    Parameters
+    ----------
+    class_ : object
+        Sampler instance that implements a `sample`, `step` and `_run` methods.
+    **kwargs
+        Keyword arguments to pass to the sampler's `sample` / `_run` methods.
+
+    Returns
+    -------
+    out : List[PosteriorParameter]
+        posterior samplers
+    """
     chains = kwargs.pop('chains')
     samplers = [class_]
 

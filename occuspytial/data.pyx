@@ -28,7 +28,7 @@ cdef extern from 'Python.h':
 
 
 cdef extern from 'numpy/arrayobject.h':
-    int PyArray_DIM(PyObject* arr, int n)
+    int PyArray_DIM(PyObject* arr, int n) nogil
 
 
 cdef class Data:
@@ -50,6 +50,9 @@ cdef class Data:
     surveyed : List[int]
         indices of sites were surveyed. This is calculated using `data` keys.
 
+    Methods
+    -------
+    visits(sites)
     """
     cdef PyObject* data
     cdef object _pickle_data
@@ -74,6 +77,9 @@ cdef class Data:
         for i in range(n):
             item = PySequence_Fast_GET_ITEM(obj, i)
             data_item = PyDict_GetItem(self.data, item)
+            # *_SET_ITEM steals the argument's reference so we must increment
+            # the reference count of `data_item` so the item of the `self.data`
+            # dictionary does not get deallocated.
             if append_shape:
                 array_shape = PyArray_DIM(data_item, 0)
                 Py_INCREF(array_shape)
@@ -84,7 +90,8 @@ cdef class Data:
         return out
 
     def visits(self, sites):
-        """visits(sites)
+        """
+        visits(sites)
 
         Return the number of visits per site.
 
