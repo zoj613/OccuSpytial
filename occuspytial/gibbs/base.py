@@ -30,7 +30,9 @@ class GibbsBase:
         self.rng = get_generator(random_state)
 
     def step(self):
-        raise NotImplementedError
+        raise NotImplementedError(
+            f'{self.__class__.__name__} must implement a `step` method.'
+        )
 
     def _configure(self, Q, hparams, verify_precision=True, **kwargs):
         if verify_precision:
@@ -38,9 +40,8 @@ class GibbsBase:
 
         self.state = _GibbsState()
         self.state.z = np.ones(self.X.shape[0])
-        self.state.z[self.y.surveyed] = [
-            0 if not any(self.y[site]) else 1 for site in self.y.surveyed
-        ]
+        surveyed = self.y.surveyed
+        self.state.z[surveyed] = [any(self.y[site]) for site in surveyed]
         self.state.k = self.state.z - 0.5
 
         self.fixed = FixedState()
@@ -48,17 +49,17 @@ class GibbsBase:
         self.fixed.ones = np.ones(self.fixed.n)
         self.fixed.zeros = np.zeros(self.fixed.n)
         self.fixed.not_surveyed = [
-            site for site in range(self.fixed.n) if site not in self.y.surveyed
+            site for site in range(self.fixed.n) if site not in surveyed
         ]
         self.fixed.n_ns = len(self.fixed.not_surveyed)
-        self.fixed.not_obs = [i for i in self.y.surveyed if not self.state.z[i]]
+        self.fixed.not_obs = [i for i in surveyed if not self.state.z[i]]
         self.fixed.n_no = len(self.fixed.not_obs)
-        self.fixed.obs = [i for i in self.y.surveyed if self.state.z[i]]
+        self.fixed.obs = [i for i in surveyed if self.state.z[i]]
         self.fixed.W_not_obs = self.W[self.fixed.not_obs]
         self.fixed.visits_not_obs = self.W.visits(self.fixed.not_obs)
         sections = np.cumsum(self.fixed.visits_not_obs)
-        self.fixed.sections = np.pad(sections, (1, 0))
-        self.state.section_sums = np.zeros(sections.shape[0], dtype=np.double)
+        self.fixed.stacked_w_indices = np.pad(sections, (1, 0))[:-1]
+        self.state.stack_sum = np.zeros(sections.shape[0], dtype=np.double)
         self.fixed.Q = Q if isspmatrix_csc(Q) else csc_matrix(Q)
 
         if hparams:
@@ -108,10 +109,10 @@ class GibbsBase:
         state.eta = eta
         state.spatial = self.state.eta
         state.alpha = self.rng.multivariate_normal(
-            self.fixed.a_mu, 100 * self.fixed.a_prec
+            self.fixed.a_mu, 100 * self.fixed.a_prec, method='cholesky'
         )
         state.beta = self.rng.multivariate_normal(
-            self.fixed.b_mu, 100 * self.fixed.b_prec
+            self.fixed.b_mu, 100 * self.fixed.b_prec, method='cholesky'
         )
         return state
 
