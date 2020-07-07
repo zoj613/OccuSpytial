@@ -134,9 +134,9 @@ class ProbitRSRGibbs(GibbsBase):
         self.state.spatial = self.fixed.K @ self.state.eta
 
     def _update_alpha(self):
-        W = self.state.W
-        A = W.T @ W + self.fixed.a_prec
-        b = self.fixed.a_prec_by_mu + W.T @ self.state.omega_a
+        WT = self.state.W.T
+        A = WT @ WT.T + self.fixed.a_prec
+        b = self.fixed.a_prec_by_mu + WT @ self.state.omega_a
         self.state.alpha = self.dists.mvnorm.rvs(b, A)
 
     def _update_beta(self):
@@ -163,11 +163,9 @@ class ProbitRSRGibbs(GibbsBase):
         # values.
         num2sf = np.clip(1 - ndtr(w_a), a_min=1e-4, a_max=np.inf)
         lognum2 = np.log(num2sf)
-        np.add.reduceat(
-            lognum2, self.fixed.stacked_w_indices, out=self.state.stack_sum
-        )
-        lognum = lognum1 + self.state.stack_sum
-        prod_sf = np.exp(self.state.stack_sum)
+        stack_sum = np.add.reduceat(lognum2, self.fixed.stacked_w_indices)
+        lognum = lognum1 + stack_sum
+        prod_sf = np.exp(stack_sum)
         logp = lognum - np.log(1 - num1 + num1 * prod_sf)
         self.state.z[no] = np.log(self.rng.uniform(size=n_no)) < logp
 
