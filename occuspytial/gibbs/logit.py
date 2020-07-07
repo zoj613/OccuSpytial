@@ -85,10 +85,8 @@ class LogitICARGibbs(GibbsBase):
         y = -np.logaddexp(0, -xb_eta)
         w_a = self.fixed.W_not_obs @ self.state.alpha
         omd = -np.logaddexp(0, w_a)
-        np.add.reduceat(
-            omd, self.fixed.stacked_w_indices, out=self.state.stack_sum
-        )
-        x = y + self.state.stack_sum
+        stack_sum = np.add.reduceat(omd, self.fixed.stacked_w_indices)
+        x = y + stack_sum
         c = -np.logaddexp(0, xb_eta)
         logp = x - np.logaddexp(c, x)
         self.state.z[no] = np.log(self.rng.uniform(size=n_no)) < logp

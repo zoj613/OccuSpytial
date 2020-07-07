@@ -59,7 +59,6 @@ class GibbsBase:
         self.fixed.visits_not_obs = self.W.visits(self.fixed.not_obs)
         sections = np.cumsum(self.fixed.visits_not_obs)
         self.fixed.stacked_w_indices = np.pad(sections, (1, 0))[:-1]
-        self.state.stack_sum = np.zeros(sections.shape[0], dtype=np.double)
         self.fixed.Q = Q if isspmatrix_csc(Q) else csc_matrix(Q)
 
         if hparams:
