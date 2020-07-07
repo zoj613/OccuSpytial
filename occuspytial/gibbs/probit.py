@@ -7,7 +7,6 @@ from scipy.stats import truncnorm
 from ..distributions import DenseMultivariateNormal2
 
 from .base import GibbsBase
-from ._cumsum import split_sum
 
 
 class ProbitRSRGibbs(GibbsBase):
@@ -164,9 +163,11 @@ class ProbitRSRGibbs(GibbsBase):
         # values.
         num2sf = np.clip(1 - ndtr(w_a), a_min=1e-4, a_max=np.inf)
         lognum2 = np.log(num2sf)
-        split_sum(lognum2, self.fixed.sections, self.state.section_sums)
-        lognum = lognum1 + self.state.section_sums
-        prod_sf = np.exp(self.state.section_sums)
+        np.add.reduceat(
+            lognum2, self.fixed.stacked_w_indices, out=self.state.stack_sum
+        )
+        lognum = lognum1 + self.state.stack_sum
+        prod_sf = np.exp(self.state.stack_sum)
         logp = lognum - np.log(1 - num1 + num1 * prod_sf)
         self.state.z[no] = np.log(self.rng.uniform(size=n_no)) < logp
 

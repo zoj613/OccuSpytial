@@ -5,6 +5,7 @@ import numpy as np
 from Cython.Build import cythonize, build_ext
 
 
+# https://numpy.org/devdocs/reference/random/examples/cython/setup.py.html
 extensions = [
     Extension(
         "occuspytial.distributions",
@@ -14,13 +15,8 @@ extensions = [
         libraries=['npyrandom'],
         define_macros=[('NPY_NO_DEPRECATED_API', 0)],
     ),
-    Extension(
-        "occuspytial/gibbs/*",
-        ["occuspytial/gibbs/*.pyx"],
-        include_dirs=[np.get_include()],
-        library_dirs=[np.get_include()],
-    ),
 ]
+
 
 # source: https://github.com/sdispater/pendulum/blob/1.x/build.py
 def build(setup_kwargs):

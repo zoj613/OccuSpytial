@@ -10,7 +10,6 @@ from ..distributions import (
 )
 
 from .base import GibbsBase
-from ._cumsum import split_sum
 
 
 class LogitICARGibbs(GibbsBase):
@@ -60,17 +59,18 @@ class LogitICARGibbs(GibbsBase):
         self.state.spatial = self.state.eta
 
     def _update_alpha(self):
-        W = self.state.W
+        WT = self.state.W.T
         y = self.y[self.state.exists] - 0.5
-        A = (W.T * self.state.omega_a) @ W + self.fixed.a_prec
-        b = W.T @ y + self.fixed.a_prec_by_mu
+        A = (WT * self.state.omega_a) @ WT.T + self.fixed.a_prec
+        b = WT @ y + self.fixed.a_prec_by_mu
         self.state.alpha = self.dists.mvnorm.rvs(b, A)
 
     def _update_beta(self):
         spat = self.state.spatial
         omega = self.state.omega_b
-        A = (self.X.T * omega) @ self.X + self.fixed.b_prec
-        b = self.X.T @ (self.state.k - (omega * spat)) + self.fixed.b_prec_by_mu
+        XT = self.X.T
+        A = (XT * omega) @ self.X + self.fixed.b_prec
+        b = XT @ (self.state.k - (omega * spat)) + self.fixed.b_prec_by_mu
         self.state.beta = self.dists.mvnorm.rvs(b, A)
 
     def _update_z(self):
@@ -85,8 +85,10 @@ class LogitICARGibbs(GibbsBase):
         y = -np.logaddexp(0, -xb_eta)
         w_a = self.fixed.W_not_obs @ self.state.alpha
         omd = -np.logaddexp(0, w_a)
-        split_sum(omd, self.fixed.sections, self.state.section_sums)
-        x = y + self.state.section_sums
+        np.add.reduceat(
+            omd, self.fixed.stacked_w_indices, out=self.state.stack_sum
+        )
+        x = y + self.state.stack_sum
         c = -np.logaddexp(0, xb_eta)
         logp = x - np.logaddexp(c, x)
         self.state.z[no] = np.log(self.rng.uniform(size=n_no)) < logp

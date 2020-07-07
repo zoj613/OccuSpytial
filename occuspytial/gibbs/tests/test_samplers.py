@@ -155,6 +155,7 @@ def test_sampler_with_no_step_method():
             super().__init__(Q, W, X, y)
             super()._configure(Q, None)
 
-    with pytest.raises(NotImplementedError):
+    msg = 'FakeSampler must implement a `step` method.'
+    with pytest.raises(NotImplementedError, match=msg):
         s = FakeSampler(Q, W, X, y)
         s.sample(5)
