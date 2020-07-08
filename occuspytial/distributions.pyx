@@ -10,7 +10,9 @@ from cpython.pycapsule cimport PyCapsule_IsValid, PyCapsule_GetPointer
 import numpy as np
 cimport numpy as np
 from numpy.random cimport bitgen_t
-from numpy.random.c_distributions cimport random_standard_normal_fill
+from numpy.random.c_distributions cimport (
+    random_standard_normal_fill, random_positive_int64
+)
 
 from pypolyagamma import PyPolyaGamma
 from scipy.linalg.cython_blas cimport dtrmv, dtrsv
@@ -26,8 +28,6 @@ except ImportError:
     )
     USE_SKSPARSE = False
 
-from .utils import get_generator
-
 
 __all__ = (
     'SumToZeroMultivariateNormal',
@@ -37,8 +37,6 @@ __all__ = (
 )
 
 np.import_array()
-
-cdef dict OPTS = {'SymmetricMode': True}
 
 
 cdef class Distribution:
@@ -65,34 +63,43 @@ cdef class Distribution:
 
 cdef class SparseMultivariateNormal(Distribution):
 
-    cpdef tuple rvs(self, double[:] mean, cov):
-        cdef int size = mean.shape[0]
-        cdef np.ndarray arr = np.empty(size)
+    cpdef tuple rvs(self, np.ndarray mean, cov):
+        cdef:
+            np.npy_intp* dims = np.PyArray_DIMS(mean)
+            np.npy_intp size = np.PyArray_SIZE(mean)
+            np.ndarray out = np.PyArray_EMPTY(1, dims, np.NPY_DOUBLE, 0)
 
         factor = sparse_cholesky(cov, ordering_method='default')
         L = factor.L()
         chol = factor.apply_Pt(L)
 
         with self.lock, nogil:
-            random_standard_normal_fill(
-                self.rng, size, <double*>np.PyArray_DATA(arr)
-            )
+            array_data = <double*>np.PyArray_DATA(out)
+            random_standard_normal_fill(self.rng, size, array_data)
 
-        arr = mean + chol * arr
-        return arr, factor
+        out = mean + chol * out
+        return out, factor
 
 
 cdef class DenseMultivariateNormal(Distribution):
 
-    cpdef tuple rvs(self, double[:] mean, double[::1, :] cov, bint overwrite_cov=True):
-        cdef int n = mean.shape[0]
-        cdef Py_ssize_t i
-        cdef int info, incx = 1
-        cdef double[::1, :] chol = cov
-        cdef np.ndarray std = np.empty(n)
+    cpdef tuple rvs(self, np.ndarray mean, cov, bint overwrite_cov=True):
+        cdef:
+            Py_ssize_t i
+            np.ndarray chol_arr
+            np.npy_intp* dims = np.PyArray_DIMS(mean)
+            np.ndarray out = np.PyArray_EMPTY(1, dims, np.NPY_DOUBLE, 1)
+            int info, incx = 1
+            double[::1, :] chol = cov
+            double[::1] out_v = out
+            double[::1] mean_v = mean
+            int n = mean_v.shape[0]
+            np.npy_intp size = <np.npy_intp>n
+            double* array_data
 
         if not overwrite_cov:
-            chol = np.copy(cov, order='F')
+            chol_arr = np.PyArray_NewCopy(cov, np.NPY_FORTRANORDER)
+            chol = chol_arr
 
         with nogil:
             # LAPACK cholesky decomposition
@@ -102,19 +109,17 @@ cdef class DenseMultivariateNormal(Distribution):
             raise RuntimeError('Cholesky Factorization failed')
 
         with self.lock, nogil:
-            random_standard_normal_fill(
-                self.rng, n, <double*>np.PyArray_DATA(std)
-            )
-
-        cdef double[::1] std_v = std
+            array_data = <double*>np.PyArray_DATA(out)
+            random_standard_normal_fill(self.rng, size, array_data)
 
         with nogil:
             # BLAS matrix-vector product
-            dtrmv('U', 'T', 'N', &n, &chol[0, 0], &n, &std_v[0], &incx)
+            dtrmv('U', 'T', 'N', &n, &chol[0, 0], &n, &out_v[0], &incx)
             for i in range(n):
-                std_v[i] += mean[i]
+                out_v[i] += mean_v[i]
 
-        return std, chol
+        factor = np.PyArray_FROM_O(chol)
+        return out, factor
 
 
 cdef class DenseMultivariateNormal2(Distribution):
@@ -124,33 +129,38 @@ cdef class DenseMultivariateNormal2(Distribution):
     def __cinit__(self, random_state=None):
         self.mvnorm = DenseMultivariateNormal(random_state)
 
-    def rvs(self, double[:] b, double[:, :] prec):
-        cdef int n = b.shape[0]
-        cdef int incx = 1
-        cdef double[::1, :] prec_d = np.asfortranarray(prec)
+    def rvs(self, np.ndarray b, prec):
+        cdef:
+            int n = <int>np.PyArray_SIZE(b)
+            int incx = 1
+            double[:] out_v
+            double[::1, :] chol_v
 
-        s, chol = self.mvnorm.rvs(b, prec_d)
-        cdef double[:] s_v = s
-        cdef double[::1, :] chol_v = chol
+        prec_d = np.PyArray_FROM_OF(prec, np.NPY_ARRAY_F_CONTIGUOUS)
+        out, chol = self.mvnorm.rvs(b, prec_d)
+        out_v = out
+        chol_v = chol
 
         with nogil:
             # BLAS triangular matrix direct solver
-            dtrsv('U', 'T', 'N', &n, &chol_v[0, 0], &n, &s_v[0], &incx)
-            dtrsv('U', 'N', 'N', &n, &chol_v[0, 0], &n, &s_v[0], &incx)
+            dtrsv('U', 'T', 'N', &n, &chol_v[0, 0], &n, &out_v[0], &incx)
+            dtrsv('U', 'N', 'N', &n, &chol_v[0, 0], &n, &out_v[0], &incx)
 
-        return s
+        return out
 
 
 cdef void scale_arr(double[:] x, double[:] z, double[:] out, int size) nogil:
-    cdef Py_ssize_t i
-    cdef double x_sum = 0, z_sum = 0
-    cdef double a
-    # a = -x.sum() / z.sum()
+    cdef:
+        Py_ssize_t i
+        double x_sum = 0, z_sum = 0
+        double a
+
     for i in range(size):
         x_sum += x[i]
         z_sum += z[i]
+
     a = - x_sum / z_sum
-    # out = x + a * z
+
     for i in range(size):
         out[i] = x[i] + a * z[i]
 
@@ -162,19 +172,19 @@ cdef class FastSumToZeroMultivariateNormal(Distribution):
     def __cinit__(self, random_state=None):
         self.mvnorm = SparseMultivariateNormal(random_state)
 
-    def rvs(self, double[:] b, prec):
-        cdef int size = b.shape[0]
-        cdef double[:] x, z
+    def rvs(self, np.ndarray b, prec):
+        cdef int size = <int>np.PyArray_SIZE(b)
+        cdef double[:] x, z, out_v
 
-        s, factor = self.mvnorm.rvs(b, prec)
-        cdef double[:] s_v = s
+        out, factor = self.mvnorm.rvs(b, prec)
+        out_v = out
 
-        x = factor.solve_A(s)
-        s_v[...] = 1 
-        z = factor.solve_A(s)
+        x = factor.solve_A(out)
+        out_v[...] = 1 
+        z = factor.solve_A(out)
 
-        scale_arr(x, z, s_v, size)
-        return s
+        scale_arr(x, z, out_v, size)
+        return out
 
 
 cdef class SlowSumToZeroMultivariateNormal(Distribution):
@@ -184,15 +194,21 @@ cdef class SlowSumToZeroMultivariateNormal(Distribution):
     def __cinit__(self, random_state=None):
         self.mvnorm = DenseMultivariateNormal(random_state)
 
-    def rvs(self, double[:] b, prec):
-        cdef int n = b.shape[0]
-        cdef int incx = 1
-        cdef double[::1, :] prec_d = prec.toarray(order='F')
+    def rvs(self, np.ndarray b, prec):
+        cdef:
+            int n = <int>np.PyArray_SIZE(b)
+            int incx = 1
+            double[::1, :] prec_v, chol_v
+            double[::1] x, z
 
-        s, chol = self.mvnorm.rvs(b, prec_d)
-        cdef double[::1] x = s
-        cdef double[::1, :] chol_v = chol
-        cdef double[::1] z = prec_d[:, 0]
+
+        prec_d = prec.toarray(order='F')
+        prec_v = prec_d
+
+        out, chol = self.mvnorm.rvs(b, prec_d)
+        x = out
+        chol_v = chol
+        z = prec_v[:, 0]
         z[...] = 1
 
         with nogil:
@@ -203,7 +219,7 @@ cdef class SlowSumToZeroMultivariateNormal(Distribution):
             dtrsv('U', 'N', 'N', &n, &chol_v[0, 0], &n, &z[0], &incx)
 
         scale_arr(x, z, x, n)
-        return s
+        return out
 
 
 if USE_SKSPARSE:
@@ -212,26 +228,25 @@ else:
     SumToZeroMultivariateNormal = SlowSumToZeroMultivariateNormal
 
 
-cdef class PolyaGamma:
-    cdef object random_state
-    cdef object rng
+cdef class PolyaGamma(Distribution):
+    cdef object rng_pg
 
     def __cinit__(self, random_state=None):
+        cdef long random_int = 0
         if random_state is None:
-            rng = get_generator(random_state)
-            random_state = rng.integers(low=0, high=2 ** 63)
-        self.rng = PyPolyaGamma(random_state)
-        self.random_state = random_state
-
-    def __reduce__(self):
-        return self.__class__, (self.random_state,)
+            with self.lock, nogil:
+                random_int = random_positive_int64(self.rng)
+        self.rng_pg = PyPolyaGamma(random_int)
 
     def rvs(self, a, b, double[:] out=None):
+        cdef np.npy_intp* dims
+
         if isinstance(a, Number):
-            return self.rng.pgdraw(a, b)
+            return self.rng_pg.pgdraw(a, b)
         elif out is not None:
-            self.rng.pgdrawv(a, b, out)
+            self.rng_pg.pgdrawv(a, b, out)
         else:
-            out_arr = np.zeros(b.shape[0], dtype=np.double)
-            self.rng.pgdrawv(a, b, out_arr)
+            dims = np.PyArray_DIMS(a)
+            out_arr = np.PyArray_EMPTY(1, dims, np.NPY_DOUBLE, 0)
+            self.rng_pg.pgdrawv(a, b, out_arr)
             return out_arr
