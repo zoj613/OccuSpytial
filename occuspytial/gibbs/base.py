@@ -26,7 +26,6 @@ class GibbsBase:
         self.X = X
         self.y = Data(y)
         self.chain = None
-        self.random_state = random_state
         self.rng = get_generator(random_state)
 
     def step(self):
