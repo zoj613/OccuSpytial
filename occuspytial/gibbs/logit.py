@@ -27,7 +27,7 @@ class LogitICARGibbs(GibbsBase):
         else:
             self.fixed.pertub = pertub
 
-        random_state = self.random_state
+        random_state = self.rng.integers(low=0, high=2 ** 63)
         self.dists.pg = PolyaGamma(random_state)
         self.dists.sum2zero_mvnorm = SumToZeroMultivariateNormal(random_state)
         self.dists.mvnorm = DenseMultivariateNormal2(random_state)

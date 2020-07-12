@@ -21,7 +21,8 @@ class ProbitRSRGibbs(GibbsBase):
         self.state.omega_b = np.zeros(self.fixed.n)
         self.fixed.XTX_plus_bprec = self.X.T @ self.X + self.fixed.b_prec
         self.fixed.eps_chol_factor = np.ones(self.X.shape[0]) / np.sqrt(2)
-        self.dists.mvnorm = DenseMultivariateNormal2(self.random_state)
+        random_state = self.rng.integers(low=0, high=2 ** 63)
+        self.dists.mvnorm = DenseMultivariateNormal2(random_state)
 
         # XTX_i = inv(self.X.T @ self.X)
         chol = np.linalg.cholesky(self.X.T @ self.X)
