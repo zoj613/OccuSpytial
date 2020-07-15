@@ -10,13 +10,16 @@ def test_data():
 
     assert np.all(d.surveyed == [1, 2, 3])
     assert len(d) == 3
+    assert np.all(d.visits([1, 3]) == (5, 2))
     assert np.all(d.visits((1, 3)) == (5, 2))
     assert d.visits(3) == 2
 
     assert d[1] is dic[1]
 
     sites = d[[1, 3]]
+    sites2 = d[(1, 3)]
     assert np.allclose(sites, np.concatenate((dic[1], dic[3])))
+    assert np.allclose(sites2, np.concatenate((dic[1], dic[3])))
     assert sites.size == 7
     assert sites.ndim == 1
 

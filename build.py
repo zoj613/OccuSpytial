@@ -15,6 +15,13 @@ extensions = [
         libraries=['npyrandom'],
         define_macros=[('NPY_NO_DEPRECATED_API', 0)],
     ),
+    Extension(
+        "occuspytial.data",
+        ["occuspytial/data.pyx"],
+        include_dirs=[np.get_include()],
+        library_dirs=[np.get_include()],
+        define_macros=[('NPY_NO_DEPRECATED_API', 0)],
+    ),
 ]
 
 
