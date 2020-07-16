@@ -31,6 +31,9 @@ def build(setup_kwargs):
     This function is mandatory in order to build the extensions.
     """
     setup_kwargs.update({
-        'ext_modules': cythonize(extensions),
+        'ext_modules': cythonize(
+            extensions,
+            compiler_directives={'embedsignature': True}
+        ),
         'cmdclass': {'build_ext': build_ext}
     })

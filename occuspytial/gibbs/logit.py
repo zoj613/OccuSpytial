@@ -14,6 +14,68 @@ from .base import GibbsBase
 
 class LogitICARGibbs(GibbsBase):
 
+    """Gibbs sampler using logit link and ICAR model for spatial random effects
+
+    Parameters
+    ----------
+    Q : np.ndarray
+        Spatial precision matrix of spatial random effects.
+    W : Dict[int, np.ndarray]
+        Dictionary of detection corariates where the keys are the site numbers
+        of the surveyed sites and the values are arrays containing
+        the design matrix of each corresponding site.
+    X : np.ndarray
+        Design matrix of species occupancy covariates.
+    y : Dict[int, np.ndarray]
+        Dictionary of survey data where the keys are the site numbers of the
+        surveyed sites and the values are number arrays of 1's and 0's
+        where 0's indicate "no detection" and 1's indicate "detection". The
+        length of each array equals the number of visits in the corresponding
+        site.
+    hparams : {None, Dict[str, Union[float, np.ndarray]}, optional
+        Hyperparameters of the occupancy model. valid keys for the dictionary
+        are:
+            - ``alpha`` : coefficients of conditional detection covariates.
+            - ``beta`` : coefficients of occupancy covariates
+            - ``tau`` : spatial precision parameter
+    random_state : {None, int, numpy.random.SeedSequence}
+        A seed to initialize the bitgenerator.
+    pertub : float, optional
+        The value by which to pertube the diagonal of the spatial precision
+        matrix in order to stabilize the cholesky factorization of the
+        posterior precision matrix of the :math:`\\eta` parameter. This is
+        sometimes referred to as modified cholesky decompostion [1]_ . It helps
+        get numerically stable samples from the conditional distribution of
+        this parameter.
+
+    Methods
+    -------
+    sample(size, burnin=0, start=None, chains=1, progressbar=True)
+
+    See Also
+    --------
+    occuspytial.gibbs.probit.ProbitRSRGibbs :
+        A gibbs sampler using a probit link function
+
+    Notes
+    -----
+    The algorithm developed here is the same as the one presented in [2]_
+    except the model used to account for spatial correlation is the
+    Intrinsic Conditional Autoregressive (ICAR) model. A polya-gamma random
+    variable distribution is used in a data augmentation strategy in order to
+    obtain known conditional distributions to sample from, thus arising the
+    Gibbs sampler impelemented here. Details of the sampler are explained in
+    [2]_ .
+
+    References
+    ----------
+    .. [1] McSweeney, T. Modified Cholesky Decomposition and
+       Applications. 2017; Masters thesis, University of Manchester.
+    .. [2]  Clark, AE, Altwegg, R. Efficient Bayesian analysis of occupancy
+       models with logit link functions. Ecol Evol. 2019; 9: 756– 768.
+       https://doi.org/10.1002/ece3.4850.
+
+    """
     def __init__(self, Q, W, X, y, hparams=None, random_state=None, pertub=None):
         super().__init__(Q, W, X, y, hparams, random_state)
         self._configure(Q, hparams, pertub)
@@ -33,6 +95,10 @@ class LogitICARGibbs(GibbsBase):
         self.dists.mvnorm = DenseMultivariateNormal2(random_state)
 
     def _update_omega_a(self):
+        """Update the latent variable associated with the cofficients of the
+        conditional detection covariates.
+        """
+        # get occopancy state of the sites where species was not observed.
         not_obs_occupancy = [i for i in self.fixed.not_obs if self.state.z[i]]
         self.state.exists = self.fixed.obs + not_obs_occupancy
         self.state.W = self.W[self.state.exists]
@@ -41,6 +107,9 @@ class LogitICARGibbs(GibbsBase):
         self.state.omega_a = b
 
     def _update_omega_b(self):
+        """Update the latent variable associated with the cofficients of the
+        occupancy covariates.
+        """
         b = self.X @ self.state.beta + self.state.spatial
         self.dists.pg.rvs(self.fixed.ones, b, b)
         self.state.omega_b = b
@@ -74,6 +143,7 @@ class LogitICARGibbs(GibbsBase):
         self.state.beta = self.dists.mvnorm.rvs(b, A)
 
     def _update_z(self):
+        """Update the occupancy state of each site"""
         no = self.fixed.not_obs
         n_no = self.fixed.n_no
         ns = self.fixed.not_surveyed
@@ -99,6 +169,10 @@ class LogitICARGibbs(GibbsBase):
         self.state.k = self.state.z - 0.5
 
     def step(self):
+        """The steps taken to complete one gibbs sampler update. The method
+        should not be called directly. It is called internally by the
+        ``sample`` method.
+        """
         self._update_omega_b()
         self._update_tau()
         self._update_eta()
@@ -109,6 +183,67 @@ class LogitICARGibbs(GibbsBase):
 
 
 class LogitRSRGibbs(LogitICARGibbs):
+    """Gibbs sampler using logit link and RSR model for spatial random effects.
+
+    This algorithm is an implementation of the gibbs sampler in [1]_ where a
+    Reduced Spatial Regression (RSR) model is used to account for spatial
+    autocorrelation in a single-season site occupancy model.
+
+    Parameters
+    ----------
+    Q : np.ndarray
+        Spatial precision matrix of spatial random effects.
+    W : Dict[int, np.ndarray]
+        Dictionary of detection corariates where the keys are the site numbers
+        of the surveyed sites and the values are arrays containing
+        the design matrix of each corresponding site.
+    X : np.ndarray
+        Design matrix of species occupancy covariates.
+    y : Dict[int, np.ndarray]
+        Dictionary of survey data where the keys are the site numbers of the
+        surveyed sites and the values are number arrays of 1's and 0's
+        where 0's indicate "no detection" and 1's indicate "detection". The
+        length of each array equals the number of visits in the corresponding
+        site.
+    hparams : {None, Dict[str, Union[float, np.ndarray]}, optional
+        Hyperparameters of the occupancy model. valid keys for the dictionary
+        are:
+            - ``alpha`` : coefficients of conditional detection covariates.
+            - ``beta`` : coefficients of occupancy covariates
+            - ``tau`` : spatial precision parameter
+    random_state : {None, int, numpy.random.SeedSequence}
+        A seed to initialize the bitgenerator.
+    r : float, optional
+        The threshold of non-negative eigenvalues to keep of the Moran matrix
+        to form the RSR precision matrix. Defaults to 0.5, meaning only
+        columns of the Moran matrix that have corresponding eigenvalues
+        greater than 0.5 will be used. If `q` is set, then this parameter is
+        ignored.
+    q : int, optional
+        The number of columns of the Moran matrix to use in order to form the
+        spatial precision matrix of the RSR model. If this parameter is used,
+        then the value of the `r` parameter is ignore. If the value is None,
+        then the default value of `r` is used to create the spatial precision
+        matrix of the RSR model. Defaults to None.
+
+    Methods
+    -------
+    sample(size, burnin=0, start=None, chains=1, progressbar=True)
+
+    See Also
+    --------
+    occuspytial.gibbs.logiit.LogitICARGibbs :
+        The same sampler but using an ICAR model.
+    occuspytial.gibbs.probit.ProbitRSRGibbs :
+        A gibbs sampler using a probit link function.
+
+    References
+    ----------
+    .. [1]  Clark, AE, Altwegg, R. Efficient Bayesian analysis of occupancy
+       models with logit link functions. Ecol Evol. 2019; 9: 756– 768.
+       https://doi.org/10.1002/ece3.4850.
+
+    """
     def __init__(
         self, Q, W, X, y, hparams=None, random_state=None, r=0.5, q=None,
     ):
@@ -129,6 +264,7 @@ class LogitRSRGibbs(LogitICARGibbs):
         A.data = -A.data
         A.setdiag(0)
         omega = self.fixed.n * (P.T @ A @ P) / A.sum()
+
         # return eigen vectors of omega and keep first q columns
         # corresponding to the q largest eigenvalues of omega greater
         # than the specified threshold

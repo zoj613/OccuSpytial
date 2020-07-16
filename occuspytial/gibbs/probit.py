@@ -10,6 +10,74 @@ from .base import GibbsBase
 
 
 class ProbitRSRGibbs(GibbsBase):
+
+    """Sampler using probit link and RSR model for spatial random effects.
+
+    This algorithm is an implementation of the gibbs sampler in [1]_ where a
+    Reduced Spatial Regression (RSR) model is used to account for spatial
+    autocorrelation in a single-season site occupancy model, but a probit
+    link function is used instead of a logit.
+
+    Parameters
+    ----------
+    Q : np.ndarray
+        Spatial precision matrix of spatial random effects.
+    W : Dict[int, np.ndarray]
+        Dictionary of detection corariates where the keys are the site numbers
+        of the surveyed sites and the values are arrays containing
+        the design matrix of each corresponding site.
+    X : np.ndarray
+        Design matrix of species occupancy covariates.
+    y : Dict[int, np.ndarray]
+        Dictionary of survey data where the keys are the site numbers of the
+        surveyed sites and the values are number arrays of 1's and 0's
+        where 0's indicate "no detection" and 1's indicate "detection". The
+        length of each array equals the number of visits in the corresponding
+        site.
+    hparams : {None, Dict[str, Union[float, np.ndarray]}, optional
+        Hyperparameters of the occupancy model. valid keys for the dictionary
+        are:
+            - ``alpha`` : coefficients of conditional detection covariates.
+            - ``beta`` : coefficients of occupancy covariates
+            - ``tau`` : spatial precision parameter
+    random_state : {None, int, numpy.random.SeedSequence}
+        A seed to initialize the bitgenerator.
+    r : float, optional
+        The threshold of non-negative eigenvalues to keep of the Moran matrix
+        to form the RSR precision matrix. Defaults to 0.5, meaning only
+        columns of the Moran matrix that have corresponding eigenvalues
+        greater than 0.5 will be used. If `q` is set, then this parameter is
+        ignored.
+    q : int, optional
+        The number of columns of the Moran matrix to use in order to form the
+        spatial precision matrix of the RSR model. If this parameter is used,
+        then the value of the `r` parameter is ignore. If the value is None,
+        then the default value of `r` is used to create the spatial precision
+        matrix of the RSR model. Defaults to None.
+
+    Methods
+    -------
+    sample(size, burnin=0, start=None, chains=1, progressbar=True)
+
+    See Also
+    --------
+    occuspytial.gibbs.probit.LogitRSRGibbs :
+        The RSR gibbs sampler using a Logit link function.
+
+    Notes
+    -----
+    When the assumption that the random effect :math:`\\epsilon` is normally
+    distributed fails to hold, then a functional form misspecification issue
+    arises: if the model is still estimated as a probit model, the estimators
+    of the coefficients :math:`\\beta` are inconsistent [1]_.
+
+    References
+    ----------
+    .. [1]  Joachim Inkmann(2000). Misspecified heteroskedasticity in the panel
+       probit model: A small sample comparison of GMM and SML estimators.
+       Journal of Econometrics, 97(2), 227-259
+
+    """
     def __init__(
         self, Q, W, X, y, hparams=None, random_state=None, r=0.5, q=None
     ):
@@ -85,6 +153,10 @@ class ProbitRSRGibbs(GibbsBase):
             self.state.spatial = self.fixed.K @ self.state.eta
 
     def _update_omega_a(self):
+        """Update the latent variable associated with the cofficients of the
+        conditional detection covariates.
+        """
+        # get occopancy state of the sites where species was not observed.
         not_obs_occupancy = [i for i in self.fixed.not_obs if self.state.z[i]]
         self.state.exists = self.fixed.obs + not_obs_occupancy
         obs_mask = (self.y[self.state.exists] == 1)
@@ -102,6 +174,9 @@ class ProbitRSRGibbs(GibbsBase):
         )
 
     def _update_omega_b(self):
+        """Update the latent variable associated with the cofficients of the
+        occupancy covariates.
+        """
         loc = self.X @ self.state.beta + self.state.spatial + self.state.eps
         exist_mask = (self.state.z == 1)
         random_state = self.rng.integers(low=0, high=2 ** 32 - 1)
