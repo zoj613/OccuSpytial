@@ -156,11 +156,9 @@ class GibbsBase:
         self.dists = FixedState()
 
     def _verify_spatial_precision(self, Q):
-        """Varify if spatial precision matix is singular for Intrinsic
-        Conditional Autoregressive Models.
-        """
-        smallest_eigv = eigsh(Q, k=1, which='SA', return_eigenvectors=False)[0]
-        if smallest_eigv >= 1e-4:
+        """Check if Q is not singular by computing smallest eigenvalue"""
+        eig = eigsh(Q, k=1, which='SA', return_eigenvectors=False, sigma=0.001)
+        if eig[0] >= 1e-4:
             raise ValueError('Spatial precision matrix Q must be singular.')
 
     def _set_hyperparams(self, params, hyperparams):
