@@ -1,6 +1,6 @@
 import numpy as np
 from numpy.linalg import multi_dot
-from scipy.linalg import solve_triangular, eigh
+from scipy.linalg import solve_triangular
 from scipy.sparse.linalg import eigsh
 
 from ..distributions import (
@@ -268,9 +268,7 @@ class LogitRSRGibbs(LogitICARGibbs):
         # return eigen vectors of omega and keep first q columns
         # corresponding to the q largest eigenvalues of omega greater
         # than the specified threshold
-        w, v = eigh(omega, overwrite_a=True)
-        # order eigens in descending order
-        w, v = w[::-1], np.fliplr(v)
+        w, v = np.linalg.eigh(omega)
         if q:
             self.fixed.q = q
         else:
@@ -284,12 +282,13 @@ class LogitRSRGibbs(LogitICARGibbs):
                     'eigenvalues. Set threshold to a lower value'
                 )
         # keep first q eigenvectors of ordered eigens
-        K = v[:, :self.fixed.q]
+        K = v[:, -self.fixed.q:]
         # replace Q with Minv
         Q_copy = self.fixed.Q
         del self.fixed.Q
         self.fixed.Q = K.T @ Q_copy @ K
         self.fixed.K = K
+
         if not hparams:
             # `_set_default_hyperparams` has been called so modify tau_shape
             del self.fixed.tau_shape
