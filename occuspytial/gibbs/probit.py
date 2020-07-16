@@ -1,8 +1,7 @@
 import numpy as np
 from numpy.linalg import multi_dot
-from scipy.linalg import solve_triangular, eigh
-from scipy.special import ndtr, log_ndtr  # std norm cdf and its log
-from scipy.stats import truncnorm
+from scipy.linalg import solve_triangular
+from scipy.special import ndtr, ndtri  # std norm cdf and its inverse
 
 from ..distributions import DenseMultivariateNormal2
 
@@ -105,9 +104,7 @@ class ProbitRSRGibbs(GibbsBase):
         A.data = -A.data
         A.setdiag(0)
         omega = self.fixed.n * (P.T @ A @ P) / A.sum()
-        w, v = eigh(omega, overwrite_a=True)
-        # order eigens in descending order
-        w, v = w[::-1], np.fliplr(v)
+        w, v = np.linalg.eigh(omega)
         if q:
             self.fixed.q = q
         else:
@@ -121,7 +118,7 @@ class ProbitRSRGibbs(GibbsBase):
                     'eigenvalues. Set threshold to a lower value'
                 )
         # keep first q eigenvectors of ordered eigens
-        K = v[:, :self.fixed.q]
+        K = v[:, -self.fixed.q:]
         self.fixed.KTK = K.T @ K
         # replace Q with Minv
         Q_copy = self.fixed.Q
@@ -162,16 +159,16 @@ class ProbitRSRGibbs(GibbsBase):
         obs_mask = (self.y[self.state.exists] == 1)
         self.state.W = self.W[self.state.exists]
         loc = self.state.W @ self.state.alpha
-        random_state = self.rng.integers(low=0, high=2 ** 32 - 1)
         self.state.omega_a = np.zeros_like(loc)
+        # sample from truncated normal distribution in the intervals (0, inf)
+        # and (-inf, 0) using the inverse transform method
+        # source: https://github.com/scipy/scipy/issues/12370
         a = loc[obs_mask]
-        self.state.omega_a[obs_mask] = truncnorm(-a, np.inf, loc=a).rvs(
-            random_state=random_state
-        )
+        U = self.rng.random(size=a.shape[0])
+        self.state.omega_a[obs_mask] = -ndtri(ndtr(a) * U) + a
         b = loc[~obs_mask]
-        self.state.omega_a[~obs_mask] = truncnorm(-np.inf, -b, loc=b).rvs(
-            random_state=random_state
-        )
+        U = self.rng.random(size=b.shape[0])
+        self.state.omega_a[~obs_mask] = ndtri(ndtr(-b) * U) + b
 
     def _update_omega_b(self):
         """Update the latent variable associated with the cofficients of the
@@ -179,15 +176,12 @@ class ProbitRSRGibbs(GibbsBase):
         """
         loc = self.X @ self.state.beta + self.state.spatial + self.state.eps
         exist_mask = (self.state.z == 1)
-        random_state = self.rng.integers(low=0, high=2 ** 32 - 1)
         a = loc[exist_mask]
-        self.state.omega_b[exist_mask] = truncnorm(-a, np.inf, loc=a).rvs(
-            random_state=random_state
-        )
+        U = self.rng.random(size=a.shape[0])
+        self.state.omega_b[exist_mask] = -ndtri(ndtr(a) * U) + a
         b = loc[~exist_mask]
-        self.state.omega_b[~exist_mask] = truncnorm(-np.inf, -b, loc=b).rvs(
-            random_state=random_state
-        )
+        U = self.rng.random(size=b.shape[0])
+        self.state.omega_b[~exist_mask] = ndtri(ndtr(-b) * U) + b
 
     def _update_tau(self):
         eta = self.state.eta
@@ -223,31 +217,20 @@ class ProbitRSRGibbs(GibbsBase):
 
     def _update_z(self):
         no = self.fixed.not_obs
-        n_no = self.fixed.n_no
         ns = self.fixed.not_surveyed
-        n_ns = self.fixed.n_ns
         beta = self.state.beta
         K_eta = self.state.spatial
-        xb_eta = self.X[no] @ beta + K_eta[no] + self.state.eps[no]
-        w_a = self.fixed.W_not_obs @ self.state.alpha
-        num1 = ndtr(xb_eta)
-        lognum1 = log_ndtr(xb_eta)
-        # clip the values of the survival function to be no less than 1e-4
-        # as an attempt to stabilize taking the log of a nearly zero value
-        # and prevent the output from being a -infinity which causes the
-        # binomial probabilities to go outside the range [0, 1] for those
-        # values.
-        num2sf = np.clip(1 - ndtr(w_a), a_min=1e-4, a_max=np.inf)
-        lognum2 = np.log(num2sf)
-        stack_sum = np.add.reduceat(lognum2, self.fixed.stacked_w_indices)
-        lognum = lognum1 + stack_sum
-        prod_sf = np.exp(stack_sum)
-        logp = lognum - np.log(1 - num1 + num1 * prod_sf)
-        self.state.z[no] = np.log(self.rng.uniform(size=n_no)) < logp
+
+        num1 = ndtr(self.X[no] @ beta + K_eta[no] + self.state.eps[no])
+        num2 = 1 - ndtr(self.fixed.W_not_obs @ self.state.alpha)
+        stack_prod = np.multiply.reduceat(num2, self.fixed.stacked_w_indices)
+        num = (num1 * stack_prod)
+        p = num / ((1 - num1) + num)
+        self.state.z[no] = self.rng.uniform(size=self.fixed.n_no) < p
 
         if ns:
             p = ndtr(self.X[ns] @ beta + K_eta[ns] + self.state.eps[ns])
-            self.state.z[ns] = self.rng.uniform(size=n_ns) < p
+            self.state.z[ns] = self.rng.uniform(size=self.fixed.n_ns) < p
 
     def step(self):
         self._update_omega_b()
