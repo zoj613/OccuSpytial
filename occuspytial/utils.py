@@ -190,7 +190,7 @@ def make_data(
 
     Q = rand_precision_mat(row, col, max_neighbors=max_neighbors).astype(float)
     Q_pinv = np.linalg.pinv(Q.toarray())
-    eta = rng.multivariate_normal(np.zeros(n), Q_pinv / tau, method='cholesky')
+    eta = rng.multivariate_normal(np.zeros(n), Q_pinv / tau, method='eigh')
 
     X = rng.uniform(-2, 2, n * p).reshape(n, -1)
     X[:, 0] = 1
