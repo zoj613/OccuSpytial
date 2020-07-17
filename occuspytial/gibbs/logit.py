@@ -1,14 +1,14 @@
 import numpy as np
 from numpy.linalg import multi_dot
 from scipy.linalg import solve_triangular
-from scipy.sparse import block_diag
+from scipy.sparse import block_diag, bsr_matrix
 from scipy.sparse.linalg import minres
 from scipy.special import expit
 
 from ..distributions import (
+    ensure_sums_to_zero,
     PolyaGamma,
-    SumToZeroMultivariateNormal,
-    DenseMultivariateNormal2,
+    DenseMultivariateNormal2
 )
 
 from .base import GibbsBase
@@ -95,8 +95,7 @@ class _EtaICARPosterior:
         x = xz[:self._n]
         z = xz[self._n:]
 
-        a = -x.sum() / z.sum()
-        out = x + a * z
+        ensure_sums_to_zero(x, z, out, self._n)
 
         return out
 
@@ -181,7 +180,6 @@ class LogitICARGibbs(GibbsBase):
 
         random_state = self.rng.integers(low=0, high=2 ** 63)
         self.dists.pg = PolyaGamma(random_state)
-        self.dists.sum2zero_mvnorm = SumToZeroMultivariateNormal(random_state)
         self.dists.mvnorm = DenseMultivariateNormal2(random_state)
         self.dists.eta_post = _EtaICARPosterior(self.fixed.Q, self.rng)
 
@@ -194,7 +192,7 @@ class LogitICARGibbs(GibbsBase):
         self.state.exists = self.fixed.obs + not_obs_occupancy
         self.state.W = self.W[self.state.exists]
         b = self.state.W @ self.state.alpha
-        self.dists.pg.rvs(np.ones_like(b), b, b)
+        self.dists.pg.rvs_arr(np.ones_like(b), b, b)
         self.state.omega_a = b
 
     def _update_omega_b(self):
@@ -202,7 +200,7 @@ class LogitICARGibbs(GibbsBase):
         occupancy covariates.
         """
         b = self.X @ self.state.beta + self.state.spatial
-        self.dists.pg.rvs(self.fixed.ones, b, b)
+        self.dists.pg.rvs_arr(self.fixed.ones, b, b)
         self.state.omega_b = b
 
     def _update_tau(self):

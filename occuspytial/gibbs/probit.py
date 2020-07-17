@@ -174,20 +174,20 @@ class ProbitRSRGibbs(GibbsBase):
         b = loc[~obs_mask]
         a_size = a.shape[0]
         U = self.rng.random(size=loc.shape[0])
-        self.state.omega_a[obs_mask] = -ndtri(ndtr(a) * U[:a_size]) + a
+        self.state.omega_a[obs_mask] = -ndtri(ndtr(a) * (1 - U[:a_size])) + a
         self.state.omega_a[~obs_mask] = ndtri(ndtr(-b) * U[a_size:]) + b
 
     def _update_omega_b(self):
         """Update the latent variable associated with the cofficients of the
         occupancy covariates.
         """
-        loc = self.X @ self.state.beta + self.state.spatial + self.state.eps
+        loc = self.X @ self.state.beta + self.state.spatial #+ self.state.eps
         exist_mask = (self.state.z == 1)
         a = loc[exist_mask]
         b = loc[~exist_mask]
         a_size = a.shape[0]
         U = self.rng.random(size=loc.shape[0])
-        self.state.omega_b[exist_mask] = -ndtri(ndtr(a) * U[:a_size]) + a
+        self.state.omega_b[exist_mask] = -ndtri(ndtr(a) * (1 - U[:a_size])) + a
         self.state.omega_b[~exist_mask] = ndtri(ndtr(-b) * U[a_size:]) + b
 
     def _update_tau(self):
@@ -206,7 +206,7 @@ class ProbitRSRGibbs(GibbsBase):
         K = self.fixed.K
         eps = self.state.eps
         A = self.fixed.KTK + self.state.tau * self.fixed.Q
-        b = K.T @ (self.state.omega_b - self.X @ self.state.beta - eps)
+        b = K.T @ (self.state.omega_b - self.X @ self.state.beta)# - eps)
         self.state.eta = self.dists.mvnorm.rvs(b, A)
         self.state.spatial = self.fixed.K @ self.state.eta
 
@@ -218,7 +218,7 @@ class ProbitRSRGibbs(GibbsBase):
 
     def _update_beta(self):
         b = self.fixed.b_prec_by_mu + self.X.T @ (
-            self.state.omega_b - self.state.spatial - self.state.eps
+            self.state.omega_b - self.state.spatial# - self.state.eps
         )
         self.state.beta = self.dists.mvnorm.rvs(b, self.fixed.XTX_plus_bprec)
 
@@ -228,7 +228,7 @@ class ProbitRSRGibbs(GibbsBase):
         beta = self.state.beta
         K_eta = self.state.spatial
 
-        num1 = ndtr(self.X[no] @ beta + K_eta[no] + self.state.eps[no])
+        num1 = ndtr(self.X[no] @ beta + K_eta[no])# + self.state.eps[no])
         num2 = 1 - ndtr(self.fixed.W_not_obs @ self.state.alpha)
         stack_prod = np.multiply.reduceat(num2, self.fixed.stacked_w_indices)
         num = num1 * stack_prod
@@ -236,13 +236,13 @@ class ProbitRSRGibbs(GibbsBase):
         self.state.z[no] = self.rng.uniform(size=self.fixed.n_no) < p
 
         if ns:
-            p = ndtr(self.X[ns] @ beta + K_eta[ns] + self.state.eps[ns])
+            p = ndtr(self.X[ns] @ beta + K_eta[ns])# + self.state.eps[ns])
             self.state.z[ns] = self.rng.uniform(size=self.fixed.n_ns) < p
 
     def step(self):
         self._update_omega_b()
         self._update_tau()
-        self._update_eps()
+        #self._update_eps()
         self._update_eta()
         self._update_beta()
         self._update_omega_a()
