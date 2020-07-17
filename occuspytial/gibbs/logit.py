@@ -1,7 +1,9 @@
 import numpy as np
 from numpy.linalg import multi_dot
 from scipy.linalg import solve_triangular
-from scipy.sparse.linalg import eigsh
+from scipy.sparse import block_diag
+from scipy.sparse.linalg import minres
+from scipy.special import expit
 
 from ..distributions import (
     PolyaGamma,
@@ -10,6 +12,93 @@ from ..distributions import (
 )
 
 from .base import GibbsBase
+
+
+class _EtaICARPosterior:
+    r"""Posterior distribution of the eta parameter of LogitICARGibbs.
+
+    Parameters
+    ----------
+    Q : scipy sparse matrix
+        ICAR precision matrix
+    random_gen : numpy.random.Generator
+        Instance of numpy's Generator class, which exposes a number of random
+        number generating methods.
+
+    Methods
+    -------
+    rvs(b, omega, tau)
+
+    Notes
+    -----
+    The distribution is a Multivariate Normal truncated on the hyperplane
+    :math:`\mathbf{1}^T\mathbf{x} = \mathbf{0}`, and is of the form:
+
+    .. math::
+
+        \mathcal{N}(\mathbf{\Lambda}^{-1}\mathbf{b}, \mathbf{\Lambda}^{-1})
+
+
+    where :math:`\mathbf{\Lambda} = (\tau \mathbf{Q} + \mathbf{S})`.
+
+    This implementation allows one to sample from this normal distribution
+    without explicitly factorizing :math:`\mathbf{\Lambda}` or computing its
+    inverse. Since :math:`\mathbf{Q}` is known beforehand and can be factorized
+    exactly once, and that :math:`\mathbf{S}` is diagonal, a random draw from
+    this distribution can be computed efficiently as follows:
+
+        1. Compute the square-root of :math:`\mathbf{S}` and multiply it by
+           a standard normal draw.
+        2. Muliply :math`\tau` by the pre-computed eigenfactor of
+          :math:`\mathbf{Q}` and a standard normal draw of appropriate size.
+        3. Sum the result of step 1) and 2) with :math:`\mathbf{b}`. The
+           resulting array has the distribution
+
+           .. math::
+
+              \mathbf{y} = \mathcal{N}(\mathbf{b}, \mathbf{\Lambda})
+
+        4. To get the draw from the desired distribution, we solve the linear
+           system :math::`\mathbf{\Lambda}\mathbf{x} = \mathbf{y}` for
+           :math:`\mathbf{x}`, and apply Algorithm 2 of [1]_ where the
+           :math:`\mathbf{G}` in our case is :math:`\mathbf{1}^T` and
+           :math:`\mathbf{r}` is :math:`\mathbf{0}`.
+    """
+    def __init__(self, Q, random_gen):
+        self._block_Q = block_diag((Q, Q), format='csc')
+        s, u = np.linalg.eigh(Q.toarray())
+        self._eigen = u[:, 1:] * np.sqrt(s[1:])
+        self._rng = random_gen
+        self._n = Q.shape[0]
+        self._rhs = np.ones(self._n * 2)
+        self._n_plus_k = self._n + self._eigen.shape[1]
+
+    def rvs(self, b, omega, tau):
+        """Generate a random draw from this distribution."""
+        eps = self._rng.standard_normal(self._n_plus_k)
+        rnorm1 = np.sqrt(omega) * eps[:self._n]
+        rnorm2 = self._eigen @ ((tau ** 0.5) * eps[self._n:])
+        out = b + rnorm1 + rnorm2
+
+        block_prec = self._block_Q.copy()
+        block_prec.data = tau * block_prec.data
+        diag_vec = np.tile(omega, 2)
+        block_prec.setdiag(block_prec.diagonal() + diag_vec)
+
+        self._rhs[:self._n] = out
+        # Iterative solvers are efficient at solving sparse large systems.
+        xz, fail = minres(block_prec, self._rhs)
+
+        if fail:
+            raise RuntimeError('MINRES solver did not converge!')
+
+        x = xz[:self._n]
+        z = xz[self._n:]
+
+        a = -x.sum() / z.sum()
+        out = x + a * z
+
+        return out
 
 
 class LogitICARGibbs(GibbsBase):
@@ -35,9 +124,16 @@ class LogitICARGibbs(GibbsBase):
     hparams : {None, Dict[str, Union[float, np.ndarray]}, optional
         Hyperparameters of the occupancy model. valid keys for the dictionary
         are:
-            - ``alpha`` : coefficients of conditional detection covariates.
-            - ``beta`` : coefficients of occupancy covariates
-            - ``tau`` : spatial precision parameter
+            - ``a_mu``: mean of the normal prior of detection covariates.
+            - ``a_prec``: precision matrix of the normal prior of detection
+              covariates.
+            - ``b_mu``: mean of the normal prior of occupancy covariates.
+            - ``b_prec``: precision matrix of the normal prior of occupancy
+              covariates.
+            - ``tau_rate``: rate parameter of the Gamma prior of the spatial
+              parameter.
+            - ``tau_shape``: shape parameter of the Gamma prior of the spatial
+              parameter.
     random_state : {None, int, numpy.random.SeedSequence}
         A seed to initialize the bitgenerator.
     pertub : float, optional
@@ -76,29 +172,24 @@ class LogitICARGibbs(GibbsBase):
        https://doi.org/10.1002/ece3.4850.
 
     """
-    def __init__(self, Q, W, X, y, hparams=None, random_state=None, pertub=None):
+    def __init__(self, Q, W, X, y, hparams=None, random_state=None):
         super().__init__(Q, W, X, y, hparams, random_state)
-        self._configure(Q, hparams, pertub)
+        self._configure(Q, hparams)
 
-    def _configure(self, Q, hparams, pertub):
+    def _configure(self, Q, hparams):
         super()._configure(Q, hparams)
-
-        if pertub is None:
-            least_2_eigs = eigsh(Q, k=2, which='SA', return_eigenvectors=False)
-            self.fixed.pertub = least_2_eigs[0]
-        else:
-            self.fixed.pertub = pertub
 
         random_state = self.rng.integers(low=0, high=2 ** 63)
         self.dists.pg = PolyaGamma(random_state)
         self.dists.sum2zero_mvnorm = SumToZeroMultivariateNormal(random_state)
         self.dists.mvnorm = DenseMultivariateNormal2(random_state)
+        self.dists.eta_post = _EtaICARPosterior(self.fixed.Q, self.rng)
 
     def _update_omega_a(self):
         """Update the latent variable associated with the cofficients of the
         conditional detection covariates.
         """
-        # get occopancy state of the sites where species was not observed.
+        # get occupancy state of the sites where species was not observed.
         not_obs_occupancy = [i for i in self.fixed.not_obs if self.state.z[i]]
         self.state.exists = self.fixed.obs + not_obs_occupancy
         self.state.W = self.W[self.state.exists]
@@ -120,11 +211,9 @@ class LogitICARGibbs(GibbsBase):
         self.state.tau = self.rng.gamma(self.fixed.tau_shape, 1 / rate)
 
     def _update_eta(self):
-        A = self.fixed.Q.copy()
-        A.data = A.data * self.state.tau
-        A.setdiag(A.diagonal() + self.state.omega_b + self.fixed.pertub)
-        b = self.state.k - (self.state.omega_b * (self.X @ self.state.beta))
-        self.state.eta = self.dists.sum2zero_mvnorm.rvs(b, A)
+        omega = self.state.omega_b
+        b = self.state.k - (omega * (self.X @ self.state.beta))
+        self.state.eta = self.dists.eta_post.rvs(b, omega, self.state.tau)
         self.state.spatial = self.state.eta
 
     def _update_alpha(self):
@@ -145,26 +234,20 @@ class LogitICARGibbs(GibbsBase):
     def _update_z(self):
         """Update the occupancy state of each site"""
         no = self.fixed.not_obs
-        n_no = self.fixed.n_no
         ns = self.fixed.not_surveyed
-        n_ns = self.fixed.n_ns
         beta = self.state.beta
         spat = self.state.spatial
 
-        xb_eta = self.X[no] @ beta + spat[no]
-        y = -np.logaddexp(0, -xb_eta)
-        w_a = self.fixed.W_not_obs @ self.state.alpha
-        omd = -np.logaddexp(0, w_a)
-        stack_sum = np.add.reduceat(omd, self.fixed.stacked_w_indices)
-        x = y + stack_sum
-        c = -np.logaddexp(0, xb_eta)
-        logp = x - np.logaddexp(c, x)
-        self.state.z[no] = np.log(self.rng.uniform(size=n_no)) < logp
+        num1 = expit(self.X[no] @ beta + spat[no])
+        num2 = expit(self.fixed.W_not_obs @ -self.state.alpha)
+        stack_prod = np.multiply.reduceat(num2, self.fixed.stacked_w_indices)
+        num = num1 * stack_prod
+        p = num / ((1 - num1) + num)
+        self.state.z[no] = self.rng.uniform(size=self.fixed.n_no) < p
 
         if ns:
-            xb_eta_ns = self.X[ns] @ beta + spat[ns]
-            logp = -np.logaddexp(0, -xb_eta_ns)
-            self.state.z[ns] = np.log(self.rng.uniform(size=n_ns)) < logp
+            p = expit(self.X[ns] @ beta + spat[ns])
+            self.state.z[ns] = self.rng.uniform(size=self.fixed.n_ns) < p
 
         self.state.k = self.state.z - 0.5
 
@@ -180,6 +263,80 @@ class LogitICARGibbs(GibbsBase):
         self._update_omega_a()
         self._update_alpha()
         self._update_z()
+
+
+class _EtaRSRPosterior:
+    r"""Posterior distribution of the eta parameter of LogitRSRGibbs.
+
+    Parameters
+    ----------
+    Q : np.ndarray
+        RSR precision matrix.
+    random_gen : numpy.random.Generator
+        Instance of numpy's Generator class, which exposes a number of random
+        number generating methods.
+
+    Methods
+    -------
+    rvs(b, omega, tau)
+
+    Notes
+    -----
+    The distribution is of the form:
+
+    .. math::
+
+        \mathcal{N}(\mathbf{\Lambda}^{-1}\mathbf{b}, \mathbf{\Lambda}^{-1})
+
+    where
+    .. math::
+
+      \mathbf{\Lambda} = (\tau \mathbf{Q}+\mathbf{K}^{-1}\mathbf{S}\mathbf{K})
+
+    This implementation allows one to sample from this normal distribution
+    without explicitly factorizing :math:`\mathbf{\Lambda}` or computing its
+    inverse. Since :math:`\mathbf{Q}` and :math:`\mathbf{K}` are known
+    beforehand and can be factorized exactly once, and that :math:`\mathbf{S}`
+    is diagonal, a random draw from this distribution can be computed
+    efficiently as follows:
+
+        1. Multiply :math:`\mathbf{K}^{-1}` with the square-root of
+           :math:`\mathbf{S}` and a standard normal draw.
+        2. Muliply :math`\tau` by the pre-computed eigenfactor of
+          :math:`\mathbf{Q}` and a standard normal draw of appropriate size.
+        3. Sum the result of step 1) and 2) with :math:`\mathbf{b}`. The
+           resulting array has the distribution
+
+           .. math::
+
+              \mathbf{y} = \mathcal{N}(\mathbf{b}, \mathbf{\Lambda})
+
+        4. To get the draw from the desired distribution, we solve the linear
+           system :math::`\mathbf{\Lambda}\mathbf{x} = \mathbf{y}` for
+           :math:`\mathbf{x}`
+    """
+    def __init__(self, Q, K, random_gen):
+        s, u = np.linalg.eigh(Q)
+        self._Q = Q
+        self._eigen = u * np.sqrt(s)
+        self._KT = K.T
+        self._rng = random_gen
+        self._n = Q.shape[0]
+        self._n_plus_k = self._n + K.shape[0]
+
+    def rvs(self, b, omega, tau):
+        """Generate a random draw from this distribution."""
+        factor1 = self._KT * np.sqrt(omega)
+        factor2 = (tau ** 0.5) * self._eigen
+
+        eps = self._rng.standard_normal(self._n_plus_k)
+        rnorm1 = factor1 @ eps[self._n:]
+        rnorm2 = factor2 @ eps[:self._n]
+        out = b + rnorm1 + rnorm2
+
+        prec = factor1 @ factor1.T + tau * self._Q
+        out = np.linalg.solve(prec, out)
+        return out
 
 
 class LogitRSRGibbs(LogitICARGibbs):
@@ -208,9 +365,16 @@ class LogitRSRGibbs(LogitICARGibbs):
     hparams : {None, Dict[str, Union[float, np.ndarray]}, optional
         Hyperparameters of the occupancy model. valid keys for the dictionary
         are:
-            - ``alpha`` : coefficients of conditional detection covariates.
-            - ``beta`` : coefficients of occupancy covariates
-            - ``tau`` : spatial precision parameter
+            - ``a_mu``: mean of the normal prior of detection covariates.
+            - ``a_prec``: precision matrix of the normal prior of detection
+              covariates.
+            - ``b_mu``: mean of the normal prior of occupancy covariates.
+            - ``b_prec``: precision matrix of the normal prior of occupancy
+              covariates.
+            - ``tau_rate``: rate parameter of the Gamma prior of the spatial
+              parameter.
+            - ``tau_shape``: shape parameter of the Gamma prior of the spatial
+              parameter.
     random_state : {None, int, numpy.random.SeedSequence}
         A seed to initialize the bitgenerator.
     r : float, optional
@@ -294,6 +458,9 @@ class LogitRSRGibbs(LogitICARGibbs):
             del self.fixed.tau_shape
             self.fixed.tau_shape = 0.5 + 0.5 * self.fixed.q
 
+        del self.dists.eta_post
+        self.dists.eta_post = _EtaRSRPosterior(self.fixed.Q, K, self.rng)
+
     def _initialize_default_start(self, state):
         state = super()._initialize_default_start(state)
         state.eta = self.rng.normal(scale=5, size=self.fixed.q)
@@ -313,7 +480,6 @@ class LogitRSRGibbs(LogitICARGibbs):
     def _update_eta(self):
         K = self.fixed.K
         omega = self.state.omega_b
-        A = (K.T * omega) @ K + (self.state.tau * self.fixed.Q)
         b = K.T @ (self.state.k - omega * (self.X @ self.state.beta))
-        self.state.eta = self.dists.mvnorm.rvs(b, A)
+        self.state.eta = self.dists.eta_post.rvs(b, omega, self.state.tau)
         self.state.spatial = self.fixed.K @ self.state.eta
