@@ -47,9 +47,16 @@ class GibbsBase:
     hparams : {None, Dict[str, Union[float, np.ndarray]}, optional
         Hyperparameters of the occupancy model. valid keys for the dictionary
         are:
-            - ``alpha`` : coefficients of conditional detection covariates.
-            - ``beta`` : coefficients of occupancy covariates
-            - ``tau`` : spatial precision parameter
+            - ``a_mu``: mean of the normal prior of detection covariates.
+            - ``a_prec``: precision matrix of the normal prior of detection
+              covariates.
+            - ``b_mu``: mean of the normal prior of occupancy covariates.
+            - ``b_prec``: precision matrix of the normal prior of occupancy
+              covariates.
+            - ``tau_rate``: rate parameter of the Gamma prior of the spatial
+              parameter.
+            - ``tau_shape``: shape parameter of the Gamma prior of the spatial
+              parameter.
     random_state : {None, int, numpy.random.SeedSequence}
         A seed to initialize the bitgenerator.
 
@@ -113,7 +120,6 @@ class GibbsBase:
         self.fixed.Q = Q if isspmatrix_csc(Q) else csc_matrix(Q)
         self.fixed.n = self.X.shape[0]
         self.fixed.ones = np.ones(self.fixed.n)
-        self.fixed.zeros = np.zeros(self.fixed.n)
         self.fixed.not_surveyed = [
             site for site in range(self.fixed.n) if site not in surveyed
         ]

@@ -36,9 +36,16 @@ class ProbitRSRGibbs(GibbsBase):
     hparams : {None, Dict[str, Union[float, np.ndarray]}, optional
         Hyperparameters of the occupancy model. valid keys for the dictionary
         are:
-            - ``alpha`` : coefficients of conditional detection covariates.
-            - ``beta`` : coefficients of occupancy covariates
-            - ``tau`` : spatial precision parameter
+            - ``a_mu``: mean of the normal prior of detection covariates.
+            - ``a_prec``: precision matrix of the normal prior of detection
+              covariates.
+            - ``b_mu``: mean of the normal prior of occupancy covariates.
+            - ``b_prec``: precision matrix of the normal prior of occupancy
+              covariates.
+            - ``tau_rate``: rate parameter of the Gamma prior of the spatial
+              parameter.
+            - ``tau_shape``: shape parameter of the Gamma prior of the spatial
+              parameter.
     random_state : {None, int, numpy.random.SeedSequence}
         A seed to initialize the bitgenerator.
     r : float, optional
@@ -164,11 +171,11 @@ class ProbitRSRGibbs(GibbsBase):
         # and (-inf, 0) using the inverse transform method
         # source: https://github.com/scipy/scipy/issues/12370
         a = loc[obs_mask]
-        U = self.rng.random(size=a.shape[0])
-        self.state.omega_a[obs_mask] = -ndtri(ndtr(a) * U) + a
         b = loc[~obs_mask]
-        U = self.rng.random(size=b.shape[0])
-        self.state.omega_a[~obs_mask] = ndtri(ndtr(-b) * U) + b
+        a_size = a.shape[0]
+        U = self.rng.random(size=loc.shape[0])
+        self.state.omega_a[obs_mask] = -ndtri(ndtr(a) * U[:a_size]) + a
+        self.state.omega_a[~obs_mask] = ndtri(ndtr(-b) * U[a_size:]) + b
 
     def _update_omega_b(self):
         """Update the latent variable associated with the cofficients of the
@@ -177,11 +184,11 @@ class ProbitRSRGibbs(GibbsBase):
         loc = self.X @ self.state.beta + self.state.spatial + self.state.eps
         exist_mask = (self.state.z == 1)
         a = loc[exist_mask]
-        U = self.rng.random(size=a.shape[0])
-        self.state.omega_b[exist_mask] = -ndtri(ndtr(a) * U) + a
         b = loc[~exist_mask]
-        U = self.rng.random(size=b.shape[0])
-        self.state.omega_b[~exist_mask] = ndtri(ndtr(-b) * U) + b
+        a_size = a.shape[0]
+        U = self.rng.random(size=loc.shape[0])
+        self.state.omega_b[exist_mask] = -ndtri(ndtr(a) * U[:a_size]) + a
+        self.state.omega_b[~exist_mask] = ndtri(ndtr(-b) * U[a_size:]) + b
 
     def _update_tau(self):
         eta = self.state.eta
@@ -224,7 +231,7 @@ class ProbitRSRGibbs(GibbsBase):
         num1 = ndtr(self.X[no] @ beta + K_eta[no] + self.state.eps[no])
         num2 = 1 - ndtr(self.fixed.W_not_obs @ self.state.alpha)
         stack_prod = np.multiply.reduceat(num2, self.fixed.stacked_w_indices)
-        num = (num1 * stack_prod)
+        num = num1 * stack_prod
         p = num / ((1 - num1) + num)
         self.state.z[no] = self.rng.uniform(size=self.fixed.n_no) < p
 
