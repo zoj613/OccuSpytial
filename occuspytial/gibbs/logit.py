@@ -1,7 +1,7 @@
 import numpy as np
 from numpy.linalg import multi_dot
 from scipy.linalg import solve_triangular
-from scipy.sparse import block_diag, bsr_matrix
+from scipy.sparse import block_diag
 from scipy.sparse.linalg import minres
 from scipy.special import expit
 
