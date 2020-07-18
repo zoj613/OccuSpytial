@@ -8,6 +8,18 @@ from ..distributions import DenseMultivariateNormal2
 from .base import GibbsBase
 
 
+def truncnorm_inf_ppf(a, p):
+    """Returns PPF from right hand tail of truncated normal distribution
+     (a, np.inf) for small |a|."""
+    return -ndtri(ndtr(-a) * (1.0 - p))
+
+
+def truncnorm_neginf_ppf(b, p):
+    """Returns PPF from left hand tail of truncated normal distribution
+    (-np.inf, b) for small |b|."""
+    return ndtri(ndtr(b) * p)
+
+
 class ProbitRSRGibbs(GibbsBase):
 
     """Sampler using probit link and RSR model for spatial random effects.
@@ -172,10 +184,10 @@ class ProbitRSRGibbs(GibbsBase):
         # source: https://github.com/scipy/scipy/issues/12370
         a = loc[obs_mask]
         b = loc[~obs_mask]
-        a_size = a.shape[0]
-        U = self.rng.random(size=loc.shape[0])
-        self.state.omega_a[obs_mask] = -ndtri(ndtr(a) * (1 - U[:a_size])) + a
-        self.state.omega_a[~obs_mask] = ndtri(ndtr(-b) * U[a_size:]) + b
+        Ua = self.rng.random(size=a.shape[0])
+        self.state.omega_a[obs_mask] = truncnorm_inf_ppf(-a, Ua) + a
+        Ub = self.rng.random(size=b.shape[0])
+        self.state.omega_a[~obs_mask] = truncnorm_neginf_ppf(-b, Ub) + b
 
     def _update_omega_b(self):
         """Update the latent variable associated with the cofficients of the
@@ -185,10 +197,10 @@ class ProbitRSRGibbs(GibbsBase):
         exist_mask = (self.state.z == 1)
         a = loc[exist_mask]
         b = loc[~exist_mask]
-        a_size = a.shape[0]
-        U = self.rng.random(size=loc.shape[0])
-        self.state.omega_b[exist_mask] = -ndtri(ndtr(a) * (1 - U[:a_size])) + a
-        self.state.omega_b[~exist_mask] = ndtri(ndtr(-b) * U[a_size:]) + b
+        Ua = self.rng.random(size=a.shape[0])
+        self.state.omega_b[exist_mask] = truncnorm_inf_ppf(-a, Ua) + a
+        Ub = self.rng.random(size=b.shape[0])
+        self.state.omega_b[~exist_mask] = truncnorm_neginf_ppf(-b, Ub) + b
 
     def _update_tau(self):
         eta = self.state.eta
@@ -199,7 +211,7 @@ class ProbitRSRGibbs(GibbsBase):
         mean = 0.5 * (
             self.state.omega_b - self.X @ self.state.beta - self.state.spatial
         )
-        std = self.rng.standard_normal(mean.size)
+        std = self.rng.standard_normal(mean.shape[0])
         self.state.eps = mean + self.fixed.eps_chol_factor * std
 
     def _update_eta(self):

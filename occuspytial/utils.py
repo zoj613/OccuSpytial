@@ -1,6 +1,7 @@
 import warnings
 
 import numpy as np
+from scipy.linalg import pinvh
 
 
 def get_generator(random_state):
@@ -189,7 +190,7 @@ def make_data(
     col = n // row
 
     Q = rand_precision_mat(row, col, max_neighbors=max_neighbors).astype(float)
-    Q_pinv = np.linalg.pinv(Q.toarray())
+    Q_pinv = pinvh(Q.toarray(), cond=1e-5)
     eta = rng.multivariate_normal(np.zeros(n), Q_pinv / tau, method='eigh')
 
     X = rng.uniform(-2, 2, n * p).reshape(n, -1)

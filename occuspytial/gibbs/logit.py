@@ -1,3 +1,5 @@
+from math import sqrt
+
 import numpy as np
 from numpy.linalg import multi_dot
 from scipy.linalg import solve_triangular
@@ -72,12 +74,13 @@ class _EtaICARPosterior:
         self._n = Q.shape[0]
         self._rhs = np.ones(self._n * 2)
         self._n_plus_k = self._n + self._eigen.shape[1]
+        self._guess = None
 
     def rvs(self, b, omega, tau):
         """Generate a random draw from this distribution."""
         eps = self._rng.standard_normal(self._n_plus_k)
         rnorm1 = np.sqrt(omega) * eps[:self._n]
-        rnorm2 = self._eigen @ ((tau ** 0.5) * eps[self._n:])
+        rnorm2 = self._eigen @ (sqrt(tau) * eps[self._n:])
         out = b + rnorm1 + rnorm2
 
         block_prec = self._block_Q.copy()
@@ -87,7 +90,9 @@ class _EtaICARPosterior:
 
         self._rhs[:self._n] = out
         # Iterative solvers are efficient at solving sparse large systems.
-        xz, fail = minres(block_prec, self._rhs)
+        xz, fail = minres(block_prec, self._rhs, x0=self._guess)
+        # update starting guess for next call to the function
+        self._guess = xz
 
         if fail:
             raise RuntimeError('MINRES solver did not converge!')
@@ -325,7 +330,7 @@ class _EtaRSRPosterior:
     def rvs(self, b, omega, tau):
         """Generate a random draw from this distribution."""
         factor1 = self._KT * np.sqrt(omega)
-        factor2 = (tau ** 0.5) * self._eigen
+        factor2 = sqrt(tau) * self._eigen
 
         eps = self._rng.standard_normal(self._n_plus_k)
         rnorm1 = factor1 @ eps[self._n:]
@@ -480,4 +485,4 @@ class LogitRSRGibbs(LogitICARGibbs):
         omega = self.state.omega_b
         b = K.T @ (self.state.k - omega * (self.X @ self.state.beta))
         self.state.eta = self.dists.eta_post.rvs(b, omega, self.state.tau)
-        self.state.spatial = self.fixed.K @ self.state.eta
+        self.state.spatial = K @ self.state.eta

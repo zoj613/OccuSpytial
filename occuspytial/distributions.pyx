@@ -20,10 +20,13 @@ from scipy.linalg.cython_lapack cimport dpotrf
 
 __all__ = (
     'DenseMultivariateNormal',
+    'DenseMultivariateNormal2',
     'PolyaGamma',
 )
 
 np.import_array()
+
+cdef const char* CHOLESKY_FAILURE = 'Cholesky factorization failed!'
 
 
 cdef class Distribution:
@@ -47,7 +50,6 @@ cdef class Distribution:
 
         self.rng = <bitgen_t*>PyCapsule_GetPointer(capsule, capsule_name)
         self.random_state = random_state
-        self.lock = self.bitgen.lock
 
     def __reduce__(self):
         return self.__class__, (self.random_state,)
@@ -65,15 +67,16 @@ cdef class DenseMultivariateNormal(Distribution):
     -------
     rvs(mean, cov, overwrite_cov=True)
     """
-    cdef inline void crvs(self, double[::1] mean, double[::1, :] cov, double[::1] out) nogil:
+    cdef inline void crvs(self, double[::1] mean, double[::1, :] cov, double[::1] out, int* info) nogil:
         cdef:
             Py_ssize_t i
             int n = mean.shape[0]
-            int info, incx = 1
+            np.npy_intp size = <np.npy_intp>n
+            int incx = 1
 
         # LAPACK cholesky decomposition
-        dpotrf('U', &n, &cov[0, 0], &n, &info)
-        random_standard_normal_fill(self.rng, <np.npy_intp>n, &out[0])
+        dpotrf('U', &n, &cov[0, 0], &n, info)
+        random_standard_normal_fill(self.rng, size, &out[0])
         # BLAS matrix-vector product
         dtrmv('U', 'T', 'N', &n, &cov[0, 0], &n, &out[0], &incx)
         for i in range(n):
@@ -112,6 +115,7 @@ cdef class DenseMultivariateNormal(Distribution):
             out = np.PyArray_EMPTY(1, dims, np.NPY_DOUBLE, 1)
             double[::1] out_v = out
             double[::1, :] chol
+            int info
 
         if not overwrite_cov:
             a = np.PyArray_NewCopy(<np.ndarray>cov.base, np.NPY_FORTRANORDER)
@@ -119,7 +123,10 @@ cdef class DenseMultivariateNormal(Distribution):
         else:
             chol = cov.T
 
-        self.crvs(mean, chol, out_v)
+        self.crvs(mean, chol, out_v, &info)
+
+        if info:
+            raise RuntimeError(CHOLESKY_FAILURE)
 
         return out
 
@@ -180,6 +187,7 @@ cdef class DenseMultivariateNormal2(Distribution):
             double[::1, :] chol
             int n = b.shape[0]
             int incx = 1
+            int info
 
         if not overwrite_prec:
             a = np.PyArray_NewCopy(<np.ndarray>prec.base, np.NPY_FORTRANORDER)
@@ -187,7 +195,10 @@ cdef class DenseMultivariateNormal2(Distribution):
         else:
             chol = prec.T
 
-        self.mvnorm.crvs(b, chol, out_v)
+        self.mvnorm.crvs(b, chol, out_v, &info)
+
+        if info:
+            raise RuntimeError(CHOLESKY_FAILURE)
 
         with nogil:
             # BLAS triangular matrix direct solver
