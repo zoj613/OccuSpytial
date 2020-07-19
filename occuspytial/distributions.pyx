@@ -67,19 +67,17 @@ cdef class DenseMultivariateNormal(Distribution):
     -------
     rvs(mean, cov, overwrite_cov=True)
     """
-    cdef inline void crvs(self, double[::1] mean, double[::1, :] cov, double[::1] out, int* info) nogil:
+    cdef inline void crvs(self, double* mean, double* cov, double* out, int* info, int* n) nogil:
         cdef:
             Py_ssize_t i
-            int n = mean.shape[0]
-            np.npy_intp size = <np.npy_intp>n
             int incx = 1
 
         # LAPACK cholesky decomposition
-        dpotrf('U', &n, &cov[0, 0], &n, info)
-        random_standard_normal_fill(self.rng, size, &out[0])
+        dpotrf('U', n, cov, n, info)
+        random_standard_normal_fill(self.rng, <np.npy_intp>n[0], out)
         # BLAS matrix-vector product
-        dtrmv('U', 'T', 'N', &n, &cov[0, 0], &n, &out[0], &incx)
-        for i in range(n):
+        dtrmv('U', 'T', 'N', n, cov, n, out, &incx)
+        for i in range(n[0]):
             out[i] += mean[i]
 
     def rvs(self, double[::1] mean, double[:, ::1] cov, bint overwrite_cov=True):
@@ -115,6 +113,7 @@ cdef class DenseMultivariateNormal(Distribution):
             out = np.PyArray_EMPTY(1, dims, np.NPY_DOUBLE, 1)
             double[::1] out_v = out
             double[::1, :] chol
+            int n = out_v.shape[0]
             int info
 
         if not overwrite_cov:
@@ -123,7 +122,7 @@ cdef class DenseMultivariateNormal(Distribution):
         else:
             chol = cov.T
 
-        self.crvs(mean, chol, out_v, &info)
+        self.crvs(&mean[0], &chol[0, 0], &out_v[0], &info, &n)
 
         if info:
             raise RuntimeError(CHOLESKY_FAILURE)
@@ -195,7 +194,7 @@ cdef class DenseMultivariateNormal2(Distribution):
         else:
             chol = prec.T
 
-        self.mvnorm.crvs(b, chol, out_v, &info)
+        self.mvnorm.crvs(&b[0], &chol[0, 0], &out_v[0], &info, &n)
 
         if info:
             raise RuntimeError(CHOLESKY_FAILURE)
