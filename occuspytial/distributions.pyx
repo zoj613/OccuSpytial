@@ -4,7 +4,6 @@
 #cython: nonecheck=False
 #cython: cdivision=True
 from numbers import Number
-import warnings
 
 from cpython.pycapsule cimport PyCapsule_IsValid, PyCapsule_GetPointer
 import numpy as np
@@ -17,26 +16,17 @@ from numpy.random.c_distributions cimport (
 from pypolyagamma import PyPolyaGamma
 from scipy.linalg.cython_blas cimport dtrmv, dtrsv
 from scipy.linalg.cython_lapack cimport dpotrf
-try:
-    from sksparse.cholmod import cholesky as sparse_cholesky
-    USE_SKSPARSE = True
-except ImportError:
-    warnings.warn(
-        'scikit sparse is not installed. Inference may be slow. '
-        'To ensure maximum speed during sampling, please install the '
-        'sckit-sparse package via "pip install sckit-sparse".'
-    )
-    USE_SKSPARSE = False
 
 
 __all__ = (
-    'SumToZeroMultivariateNormal',
-    'SparseMultivariateNormal',
     'DenseMultivariateNormal',
+    'DenseMultivariateNormal2',
     'PolyaGamma',
 )
 
 np.import_array()
+
+cdef const char* CHOLESKY_FAILURE = 'Cholesky factorization failed!'
 
 
 cdef class Distribution:
@@ -60,61 +50,9 @@ cdef class Distribution:
 
         self.rng = <bitgen_t*>PyCapsule_GetPointer(capsule, capsule_name)
         self.random_state = random_state
-        self.lock = self.bitgen.lock
 
     def __reduce__(self):
         return self.__class__, (self.random_state,)
-
-
-cdef class SparseMultivariateNormal(Distribution):
-    """Multivariate Gaussian distribution for sparse covariance matrices.
-
-    Parameters
-    ----------
-    random_state : {None, int, numpy.random.SeedSequence}
-        A seed to initialize the random number generator. Defaults to None.
-
-    Methods
-    -------
-    rvs(mean, cov)
-    """
-    cpdef tuple rvs(self, np.ndarray mean, cov):
-        """
-        rvs(self, mean, cov)
-
-        Generate a random draw from this distribution.
-        
-        Parameters
-        ----------
-        mean : np.ndarray
-            Mean of the distribution
-        cov : scipy's sparse matrix format
-            Covariance matrix of the distribution.
-
-        Returns
-        -------
-        out : np.ndarray
-            A random sample from a multivariate Gaussian with mean vector
-            and covariance specified by `mean` and `cov`.
-        factor : sksparse.cholmod.Factor
-            The cholesky factor object of the covariance matrix.
-
-        """
-        cdef:
-            np.npy_intp* dims = np.PyArray_DIMS(mean)
-            np.npy_intp size = np.PyArray_SIZE(mean)
-            np.ndarray out = np.PyArray_EMPTY(1, dims, np.NPY_DOUBLE, 0)
-
-        factor = sparse_cholesky(cov, ordering_method='default')
-        L = factor.L()
-        chol = factor.apply_Pt(L)
-
-        with self.lock, nogil:
-            array_data = <double*>np.PyArray_DATA(out)
-            random_standard_normal_fill(self.rng, size, array_data)
-
-        out = mean + chol * out
-        return out, factor
 
 
 cdef class DenseMultivariateNormal(Distribution):
@@ -129,7 +67,22 @@ cdef class DenseMultivariateNormal(Distribution):
     -------
     rvs(mean, cov, overwrite_cov=True)
     """
-    cpdef tuple rvs(self, np.ndarray mean, cov, bint overwrite_cov=True):
+    cdef inline void crvs(self, double[::1] mean, double[::1, :] cov, double[::1] out, int* info) nogil:
+        cdef:
+            Py_ssize_t i
+            int n = mean.shape[0]
+            np.npy_intp size = <np.npy_intp>n
+            int incx = 1
+
+        # LAPACK cholesky decomposition
+        dpotrf('U', &n, &cov[0, 0], &n, info)
+        random_standard_normal_fill(self.rng, size, &out[0])
+        # BLAS matrix-vector product
+        dtrmv('U', 'T', 'N', &n, &cov[0, 0], &n, &out[0], &incx)
+        for i in range(n):
+            out[i] += mean[i]
+
+    def rvs(self, double[::1] mean, double[:, ::1] cov, bint overwrite_cov=True):
         """
         rvs(mean, cov, overwrite_cov=True)
 
@@ -158,41 +111,24 @@ cdef class DenseMultivariateNormal(Distribution):
 
         """
         cdef:
-            Py_ssize_t i
-            np.ndarray chol_arr
-            np.npy_intp* dims = np.PyArray_DIMS(mean)
-            np.ndarray out = np.PyArray_EMPTY(1, dims, np.NPY_DOUBLE, 1)
-            int info, incx = 1
-            double[::1, :] chol = cov
+            np.npy_intp* dims = <np.npy_intp*>(mean.shape)
+            out = np.PyArray_EMPTY(1, dims, np.NPY_DOUBLE, 1)
             double[::1] out_v = out
-            double[::1] mean_v = mean
-            int n = mean_v.shape[0]
-            np.npy_intp size = <np.npy_intp>n
-            double* array_data
+            double[::1, :] chol
+            int info
 
         if not overwrite_cov:
-            chol_arr = np.PyArray_NewCopy(cov, np.NPY_FORTRANORDER)
-            chol = chol_arr
+            a = np.PyArray_NewCopy(<np.ndarray>cov.base, np.NPY_FORTRANORDER)
+            chol = a
+        else:
+            chol = cov.T
 
-        with nogil:
-            # LAPACK cholesky decomposition
-            dpotrf('U', &n, &chol[0, 0], &n, &info)
+        self.crvs(mean, chol, out_v, &info)
 
-        if info != 0:
-            raise RuntimeError('Cholesky Factorization failed')
+        if info:
+            raise RuntimeError(CHOLESKY_FAILURE)
 
-        with self.lock, nogil:
-            array_data = <double*>np.PyArray_DATA(out)
-            random_standard_normal_fill(self.rng, size, array_data)
-
-        with nogil:
-            # BLAS matrix-vector product
-            dtrmv('U', 'T', 'N', &n, &chol[0, 0], &n, &out_v[0], &incx)
-            for i in range(n):
-                out_v[i] += mean_v[i]
-
-        factor = np.PyArray_FROM_O(chol)
-        return out, factor
+        return out
 
 
 cdef class DenseMultivariateNormal2(Distribution):
@@ -214,16 +150,16 @@ cdef class DenseMultivariateNormal2(Distribution):
 
     Methods
     -------
-    rvs(mean, prec)
+    rvs(mean, prec, overwrite_prec=True)
     """
     cdef DenseMultivariateNormal mvnorm
 
     def __cinit__(self, random_state=None):
         self.mvnorm = DenseMultivariateNormal(random_state)
 
-    def rvs(self, np.ndarray b, prec):
+    def rvs(self, double[::1] b, double[:, ::1] prec, bint overwrite_prec=True):
         """
-        rvs(mean, prec)
+        rvs(mean, prec, overwite_prec=True)
 
         Generate a random draw from this distribution.
 
@@ -234,6 +170,9 @@ cdef class DenseMultivariateNormal2(Distribution):
         prec : np.ndarray
             The precision matrix of the distribution (inverse of the covariance
             matrix).
+        overwrite_cov : bool
+            Whether to write over the `prec` array when computing the cholesky
+            factor instead of creating a new array. Defaults to True.
 
         Returns
         -------
@@ -242,160 +181,53 @@ cdef class DenseMultivariateNormal2(Distribution):
 
         """
         cdef:
-            int n = <int>np.PyArray_SIZE(b)
+            np.npy_intp* dims = <np.npy_intp*>(b.shape)
+            out = np.PyArray_EMPTY(1, dims, np.NPY_DOUBLE, 1)
+            double[::1] out_v = out
+            double[::1, :] chol
+            int n = b.shape[0]
             int incx = 1
-            double[:] out_v
-            double[::1, :] chol_v
+            int info
 
-        prec_d = np.PyArray_FROM_OF(prec, np.NPY_ARRAY_F_CONTIGUOUS)
-        out, chol = self.mvnorm.rvs(b, prec_d)
-        out_v = out
-        chol_v = chol
+        if not overwrite_prec:
+            a = np.PyArray_NewCopy(<np.ndarray>prec.base, np.NPY_FORTRANORDER)
+            chol = a
+        else:
+            chol = prec.T
+
+        self.mvnorm.crvs(b, chol, out_v, &info)
+
+        if info:
+            raise RuntimeError(CHOLESKY_FAILURE)
 
         with nogil:
             # BLAS triangular matrix direct solver
-            dtrsv('U', 'T', 'N', &n, &chol_v[0, 0], &n, &out_v[0], &incx)
-            dtrsv('U', 'N', 'N', &n, &chol_v[0, 0], &n, &out_v[0], &incx)
+            dtrsv('U', 'T', 'N', &n, &chol[0, 0], &n, &out_v[0], &incx)
+            dtrsv('U', 'N', 'N', &n, &chol[0, 0], &n, &out_v[0], &incx)
 
         return out
 
 
-cdef void scale_arr(double[:] x, double[:] z, double[:] out, int size) nogil:
+def ensure_sums_to_zero(
+    double[::1] x, double[::1] z, double[::1] out, int size
+):
+    """Utility function used when sampling from normal distribution truncated
+    on the hyperplace sum(x) = 0.
+    """
     cdef:
         Py_ssize_t i
         double x_sum = 0, z_sum = 0
         double a
 
-    for i in range(size):
-        x_sum += x[i]
-        z_sum += z[i]
+    with nogil:
+        for i in range(size):
+            x_sum += x[i]
+            z_sum += z[i]
 
-    a = - x_sum / z_sum
+        a = - x_sum / z_sum
 
-    for i in range(size):
-        out[i] = x[i] + a * z[i]
-
-
-cdef class FastSumToZeroMultivariateNormal(Distribution):
-    """Multivariate Gaussian distribution truncated on a hyperplane.
-
-    This class represents a multivariate Gaussian of the form:
-
-    .. math::
-
-        \mathcal{N}(\mathbf{\Lambda}^{-1}\mathbf{b}, \mathbf{\Lambda}^{-1}),
-
-    truncated on the hyperplane :math:`\mathbf{1}^T\mathbf{x} = \mathbf{0}`
-
-    In most cases only :math:`\mathbf{\Lambda}` and :math:`\mathbf{b}` are
-    available. This class facilitates sampling from a Gaussian of this form.
-
-    Parameters
-    ----------
-    random_state : {None, int, numpy.random.SeedSequence}
-        A seed to initialize the random number generator. Defaults to None.
-
-    Methods
-    -------
-    rvs(mean, prec)
-    """  
-    cdef SparseMultivariateNormal mvnorm
-
-    def __cinit__(self, random_state=None):
-        self.mvnorm = SparseMultivariateNormal(random_state)
-
-    def rvs(self, np.ndarray b, prec):
-        """
-        rvs(mean, prec)
-
-        Generate a random draw from this distribution.
-
-        Parameters
-        ----------
-        b : np.ndarray
-            The :math:`b` component of the distribution's mean.
-        prec : np.ndarray
-            The precision matrix of the distribution (inverse of the covariance
-            matrix).
-
-        Returns
-        -------
-        out : np.ndarray
-            A random variable from this distribution.
-
-        Notes
-        -----
-        The algorithm implemented here is Algorithm 2 of [1]_ where the
-        :math:`\mathbf{G}` in our case is :math:`\mathbf{1}^T` and
-        :math:`\mathbf{r}` is :math:`\mathbf{0}`.
-
-        References
-        ----------
-        .. [1] Cong, Yulai; Chen, Bo; Zhou, Mingyuan. Fast Simulation of 
-           Hyperplane-Truncated Multivariate Normal Distributions. Bayesian 
-           Anal. 12 (2017), no. 4, 1017--1037. doi:10.1214/17-BA1052. 
-           https://projecteuclid.org/euclid.ba/1488337478
-
-        """
-        cdef int size = <int>np.PyArray_SIZE(b)
-        cdef double[:] x, z, out_v
-
-        out, factor = self.mvnorm.rvs(b, prec)
-        out_v = out
-
-        x = factor.solve_A(out)
-        out_v[...] = 1 
-        z = factor.solve_A(out)
-
-        scale_arr(x, z, out_v, size)
-        return out
-
-
-cdef class SlowSumToZeroMultivariateNormal(Distribution):
-    __doc__ = FastSumToZeroMultivariateNormal.__doc__
-
-    cdef DenseMultivariateNormal mvnorm
-
-    def __cinit__(self, random_state=None):
-        self.mvnorm = DenseMultivariateNormal(random_state)
-
-    def rvs(self, np.ndarray b, prec):
-        """
-        rvs(mean, prec)
-
-        See documentation of :func:`FastSumToZeroMultivariateNormal.rvs`
-
-        """
-        cdef:
-            int n = <int>np.PyArray_SIZE(b)
-            int incx = 1
-            double[::1, :] prec_v, chol_v
-            double[::1] x, z
-
-        prec_d = prec.toarray(order='F')
-        prec_v = prec_d
-
-        out, chol = self.mvnorm.rvs(b, prec_d)
-        x = out
-        chol_v = chol
-        z = prec_v[:, 0]
-        z[...] = 1
-
-        with nogil:
-            dtrsv('U', 'T', 'N', &n, &chol_v[0, 0], &n, &x[0], &incx)
-            dtrsv('U', 'N', 'N', &n, &chol_v[0, 0], &n, &x[0], &incx)
-
-            dtrsv('U', 'T', 'N', &n, &chol_v[0, 0], &n, &z[0], &incx)
-            dtrsv('U', 'N', 'N', &n, &chol_v[0, 0], &n, &z[0], &incx)
-
-        scale_arr(x, z, x, n)
-        return out
-
-
-if USE_SKSPARSE:
-    SumToZeroMultivariateNormal = FastSumToZeroMultivariateNormal
-else:
-    SumToZeroMultivariateNormal = SlowSumToZeroMultivariateNormal
+        for i in range(size):
+            out[i] = x[i] + a * z[i]
 
 
 cdef class PolyaGamma(Distribution):
@@ -427,9 +259,17 @@ cdef class PolyaGamma(Distribution):
     def __cinit__(self, random_state=None):
         cdef long random_int = 0
         if random_state is None:
-            with self.lock, nogil:
+            with nogil:
                 random_int = random_positive_int64(self.rng)
         self.rng_pg = PyPolyaGamma(random_int)
+
+    def rvs_arr(self, double[::1] b, double[::1] z, double[::1] out):
+        """Same as `rvs` but only accepts array input.
+
+        This function is convenient for efficient access when an ou[ut array
+        is provided.
+        """
+        self.rng_pg.pgdrawv(b, z, out)
 
     def rvs(self, b, z, double[:] out=None):
         """
@@ -457,7 +297,7 @@ cdef class PolyaGamma(Distribution):
         if isinstance(b, Number):
             return self.rng_pg.pgdraw(b, z)
         elif out is not None:
-            self.rng_pg.pgdrawv(b, z, out)
+            self.rvs_arr(b, z, out)
         else:
             dims = np.PyArray_DIMS(b)
             out_arr = np.PyArray_EMPTY(1, dims, np.NPY_DOUBLE, 0)
