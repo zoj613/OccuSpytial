@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "occuspytial"
-version = "0.1.0"
+version = "0.1.0-alpha"
 description = "'A package for bayesian analysis of spatial occupancy models'"
 authors = ["Zolisa Bleki"]
 license = "BSD-3-Clause"
@@ -24,11 +24,13 @@ joblib = "^0.14.0"
 numpy = "^1.19.0"
 tqdm = "^4.46.1"
 arviz = "^0.9.0"
+libpysal = "*"
 
 [tool.poetry.dev-dependencies]
 pytest = "^5.2"
 sphinx = "*"
 Cython = "^0.29.20"
+toml = "*"
 
 [build-system]
 requires = ["poetry>=0.12", "Cython>=0.29.20"]

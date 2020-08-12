@@ -23,7 +23,7 @@ copyright = '2018-2020, Zolisa Bleki'
 author = 'Zolisa Bleki'
 
 # The full version, including alpha/beta/rc tags
-release = '0.1.0'
+release = '0.1.0-alpha'
 
 
 # -- General configuration ---------------------------------------------------
