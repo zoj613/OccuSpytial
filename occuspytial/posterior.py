@@ -22,6 +22,7 @@ class PosteriorParameter:
     data : arviz.InferenceData
         Inference data object.
     """
+
     def __init__(self, *chains):
         self.data = self._create_inference_data(chains)
 
@@ -59,7 +60,7 @@ class PosteriorParameter:
         Parameters
         ----------
         **kwargs
-            Keyword arguments optionally required by ``arviz.plot_trace``
+            Keyword arguments optionally passed to ``arviz.plot_trace``
 
         Returns
         -------
@@ -75,7 +76,7 @@ class PosteriorParameter:
         Parameters
         ----------
         **kwargs
-            Keyword arguments optionally required by ``arviz.plot_autocorr``
+            Keyword arguments optionally passed to ``arviz.plot_autocorr``
 
         Returns
         -------
@@ -91,7 +92,7 @@ class PosteriorParameter:
         Parameters
         ----------
         **kwargs
-            Keyword arguments optionally required by ``arviz.plot_pair``.
+            Keyword arguments optionally passed to ``arviz.plot_pair``.
 
         Returns
         -------
@@ -107,7 +108,7 @@ class PosteriorParameter:
         Parameters
         ----------
         **kwargs
-            Keyword arguments optionally required by `arviz.plot_posterior`
+            Keyword arguments optionally passed to `arviz.plot_posterior`
 
         Returns
         -------
@@ -123,7 +124,7 @@ class PosteriorParameter:
         Parameters
         ----------
         **kwargs
-            Keyword arguments optionally required by `arviz.plot_ess`
+            Keyword arguments optionally passed to `arviz.plot_ess`
 
         Returns
         -------

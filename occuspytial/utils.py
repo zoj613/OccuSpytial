@@ -4,23 +4,32 @@ import numpy as np
 from scipy.linalg import pinvh
 
 
-def get_generator(random_state):
+def get_generator(random_state=None):
     """Get an instance of a numpy random number generator object.
 
-    This instance uses the SFC64 bit generator, which is the fastest numpy
-    currently has to offer as of version 1.19. This function conveniently
-    instantiates a generator of this kind and should be used in all modules.
+    This instance uses `SFC64 <https://tinyurl.com/y2jtyly7>`_ bitgenerator,
+    which is the fastest numpy currently has to offer as of version 1.19.
+    This function conveniently instantiates a generator of this kind and should
+    be used in all modules.
 
     Parameters
     ----------
     random_state : {None, int, array_like[ints], numpy.random.SeedSequence}
-        A seed to initialize the bitgenerator.
+        A seed to initialize the bitgenerator. Defaults to ``None``.
 
     Returns
     -------
     numpy.random.Generator
         Instance of numpy's Generator class, which exposes a number of random
         number generating methods.
+
+    Examples
+    --------
+    >>> from occuspytial.utils import get_generator
+    >>> rng = get_generator()
+    # The instance can be used to access functions of ``numpy.random``
+    >>> rng.standard_normal()
+    -0.203  # random
     """
     bitgenerator = np.random.SFC64(random_state)
     return np.random.default_rng(bitgenerator)
@@ -56,6 +65,23 @@ def rand_precision_mat(lat_row, lat_col, max_neighbors=8, rho=1):
     ------
     ValueError
         If the `max_neighbours` is any value other than 4 or 8.
+
+    Examples
+    --------
+    >>> from occuspytial.utils import rand_precision_mat
+    >>> Q = rand_precision_mat(10, 5)
+    >>> Q
+    <50x50 sparse matrix of type '<class 'numpy.int64'>'
+            with 364 stored elements in COOrdinate format>
+    # The matrix can be converted to numpy format using method ``toarray()``
+    >>> Q.toarray()
+    array([[ 3, -1,  0, ...,  0,  0,  0],
+           [-1,  5, -1, ...,  0,  0,  0],
+           [ 0, -1,  5, ...,  0,  0,  0],
+           ...,
+           [ 0,  0,  0, ...,  5, -1,  0],
+           [ 0,  0,  0, ..., -1,  5, -1],
+           [ 0,  0,  0, ...,  0, -1,  3]])
     """
     if max_neighbors == 8:
         nn = 'queen'
@@ -149,6 +175,64 @@ def make_data(
         When `min_v` is less than 1.
         When `max_v` is less than 2 or greater than `n`.
         When `ns` is not a positive integer or greater than `n`.
+
+    Examples
+    --------
+    >>> from occuspytial.utils import make_data
+    >>> Q, W, X, y, alpha, beta, tau, z = make_data()
+    >>> Q
+    <150x150 sparse matrix of type '<class 'numpy.float64'>'
+            with 1144 stored elements in COOrdinate format>
+    >>> Q.toarray()
+    array([[ 3., -1.,  0., ...,  0.,  0.,  0.],  # random
+           [-1.,  5., -1., ...,  0.,  0.,  0.],
+           [ 0., -1.,  5., ...,  0.,  0.,  0.],
+           ...,
+           [ 0.,  0.,  0., ...,  5., -1.,  0.],
+           [ 0.,  0.,  0., ..., -1.,  5., -1.],
+           [ 0.,  0.,  0., ...,  0., -1.,  3.]])
+    >>> W
+    {81: array([[ 1.        ,  1.01334565,  0.93150242],  # random
+            [ 1.        ,  0.19276808, -1.71939657],
+            [ 1.        ,  0.23866531,  0.0559545 ],
+            [ 1.        ,  1.36102304,  1.73611887],
+            [ 1.        ,  0.47247886,  0.73410589],
+            [ 1.        , -1.9018879 ,  0.0097963 ]]),
+     131: array([[ 1.        ,  1.67846707, -1.12476746],
+            [ 1.        , -1.63131532, -1.32216705],
+            [ 1.        , -1.37431173, -0.79734213],
+            ...,
+     21: array([[ 1.        ,  1.6416734 , -1.91642502],
+            [ 1.        ,  0.2256312 , -1.68929118],
+            [ 1.        ,  1.36953093,  1.08758129],
+            [ 1.        , -1.08029212,  0.40219588]])}
+    >>> X
+    array([[ 1.        ,  0.71582433,  1.76344395],
+           [ 1.        ,  0.8561976 ,  1.0520401 ],
+           [ 1.        , -0.28051247,  0.16809809],
+           ...,
+           [ 1.        ,  0.86702262, -1.18225448],
+           [ 1.        , -0.41346399, -0.9633078 ],
+           [ 1.        , -0.23182363,  1.69930761]])
+    >>> y
+    {15: array([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),  # random
+     81: array([0, 0, 0, 1, 1, 0]),
+     ...,
+     21: array([0, 1, 0, 0])}
+    >>> alpha
+    array([-1.43291816, -0.87932413, -1.84927642])  # random
+    >>> beta
+    array([-0.62084322, -1.09645564, -0.93371374])  # random
+    >>> tau
+    1.415532667780688  # random
+    >>> z
+    array([0, 1, 1, 1, 0, 1, 1, 1, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1,
+           1, 0, 0, 0, 1, 0, 1, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 1, 0, 1,
+           1, 1, 0, 0, 1, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0,
+           0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 0, 1, 1, 0, 1, 0, 0,
+           0, 0, 0, 0, 1, 1, 0, 1, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 1,
+           0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 1, 0, 1, 0, 0, 0,
+           0, 1, 1, 1, 1, 0, 1, 1, 0, 1, 1, 1, 0, 1, 0, 0, 1, 0])
     """
     rng = get_generator(random_state)
 

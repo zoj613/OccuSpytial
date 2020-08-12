@@ -16,6 +16,7 @@ class Chain:
     ----------
     full
     """
+
     def __init__(self, params, size):
         self.size = size
         self._names = tuple(params)

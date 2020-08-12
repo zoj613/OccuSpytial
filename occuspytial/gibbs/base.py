@@ -1,7 +1,7 @@
 import numpy as np
 from scipy.sparse import csc_matrix, isspmatrix_csc
 from scipy.sparse.linalg import eigsh
-from tqdm import tqdm
+from tqdm.auto import tqdm
 
 from ..chain import Chain
 from ..data import Data
@@ -17,6 +17,7 @@ class _GibbsState(State):
     parameters of interest ('alpha', 'beta', 'tau') after each Gibbs sampler
     iteration.
     """
+
     _posterior_names = ('alpha', 'beta', 'tau')
 
     @property
@@ -77,8 +78,8 @@ class GibbsBase:
     state : :class:`~occuspytial.gibbs.state.State`
         A container to store model parameter values and other variables whose
         values change at various stages during sampling.
-
     """
+
     def __init__(self, Q, W, X, y, hparams=None, random_state=None):
         self.W = Data(W)
         self.X = X
