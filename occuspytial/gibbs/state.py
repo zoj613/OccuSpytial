@@ -9,6 +9,7 @@ class BaseStorage(SimpleNamespace):
 class State(BaseStorage):
     """Class to store parameter variables so they can be accessed as attributes
     """
+
     def __iter__(self):
         yield from self.__dict__
 
@@ -20,6 +21,7 @@ class FixedState(BaseStorage):
     Thus this class should be used for values that remain constant during
     sampling.
     """
+
     def __setattr__(self, name, value):
         if name in self.__dict__:
             raise KeyError('cannot change attributes already set')

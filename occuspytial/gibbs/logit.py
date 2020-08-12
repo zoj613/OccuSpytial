@@ -66,6 +66,7 @@ class _EtaICARPosterior:
            :math:`\mathbf{G}` in our case is :math:`\mathbf{1}^T` and
            :math:`\mathbf{r}` is :math:`\mathbf{0}`.
     """
+
     def __init__(self, Q, random_gen):
         self._block_Q = block_diag((Q, Q), format='csc')
         s, u = np.linalg.eigh(Q.toarray())
@@ -174,8 +175,8 @@ class LogitICARGibbs(GibbsBase):
     .. [2]  Clark, AE, Altwegg, R. Efficient Bayesian analysis of occupancy
        models with logit link functions. Ecol Evol. 2019; 9: 756– 768.
        https://doi.org/10.1002/ece3.4850.
-
     """
+
     def __init__(self, Q, W, X, y, hparams=None, random_state=None):
         super().__init__(Q, W, X, y, hparams, random_state)
         self._configure(Q, hparams)
@@ -318,6 +319,7 @@ class _EtaRSRPosterior:
            system :math::`\mathbf{\Lambda}\mathbf{x} = \mathbf{y}` for
            :math:`\mathbf{x}`
     """
+
     def __init__(self, Q, K, random_gen):
         s, u = np.linalg.eigh(Q)
         self._Q = Q
@@ -409,8 +411,8 @@ class LogitRSRGibbs(LogitICARGibbs):
     .. [1]  Clark, AE, Altwegg, R. Efficient Bayesian analysis of occupancy
        models with logit link functions. Ecol Evol. 2019; 9: 756– 768.
        https://doi.org/10.1002/ece3.4850.
-
     """
+
     def __init__(
         self, Q, W, X, y, hparams=None, random_state=None, r=0.5, q=None,
     ):

@@ -35,6 +35,7 @@ cdef class Distribution:
     Implementations can inherit from this class, so it should never be used
     directly.
     """
+
     cdef object random_state
     cdef object bitgen
     cdef bitgen_t* rng
@@ -67,6 +68,7 @@ cdef class DenseMultivariateNormal(Distribution):
     -------
     rvs(mean, cov, overwrite_cov=True)
     """
+
     cdef inline void crvs(self, double* mean, double* cov, double* out, int* info, int* n) nogil:
         cdef:
             Py_ssize_t i
@@ -151,6 +153,7 @@ cdef class DenseMultivariateNormal2(Distribution):
     -------
     rvs(mean, prec, overwrite_prec=True)
     """
+
     cdef DenseMultivariateNormal mvnorm
 
     def __cinit__(self, random_state=None):
@@ -263,9 +266,12 @@ cdef class PolyaGamma(Distribution):
         self.rng_pg = PyPolyaGamma(random_int)
 
     def rvs_arr(self, double[::1] b, double[::1] z, double[::1] out):
-        """Same as `rvs` but only accepts array input.
+        """
+        rvs_arr(b, z, out)
 
-        This function is convenient for efficient access when an ou[ut array
+        Same as `rvs` but only accepts array input.
+
+        This function is convenient for efficient access when an ouput array
         is provided.
         """
         self.rng_pg.pgdrawv(b, z, out)
