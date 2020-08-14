@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "occuspytial"
-version = "0.1.0-alpha"
+version = "0.1.0"
 description = "'A package for bayesian analysis of spatial occupancy models'"
 authors = ["Zolisa Bleki"]
 license = "BSD-3-Clause"
