@@ -22,6 +22,7 @@ repos:
       - id: check-yaml
       - id: no-commit-to-branch
         args: [--branch, master]
+        stages: [commit]
       - id: trailing-whitespace
       - id: end-of-file-fixer
       - id: fix-encoding-pragma
