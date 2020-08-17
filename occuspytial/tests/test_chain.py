@@ -5,7 +5,7 @@ from occuspytial.chain import Chain
 
 
 def test_chain():
-    params = {'p1':  2, 'p2': 1}
+    params = {'p1': 2, 'p2': 1}
     c = Chain(params, 1)
 
     # test the number of columns of the full array of parameters

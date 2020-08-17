@@ -111,7 +111,7 @@ cdef class Data:
         else:
             arr = PyDict_GetItem(self.data, <PyObject*>sites)
             out = PyArray_DIM(arr, 0)
-        
+
         return out
 
     def __getitem__(self, sites):

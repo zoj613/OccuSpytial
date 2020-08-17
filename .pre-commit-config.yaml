@@ -1,0 +1,47 @@
+default_language_version:
+  python: python3
+
+repos:
+  # hooks running from local virtual environment
+  - repo: local
+    hooks:
+      - id: poetry_check
+        description: Check the integrity of pyproject.toml
+        name: poetry_check
+        entry: poetry check
+        language: system
+        pass_filenames: false
+        require_serial: true
+
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v3.2.0
+    hooks:
+      - id: check-merge-conflict
+      - id: check-symlinks
+      - id: check-toml
+      - id: check-yaml
+      - id: no-commit-to-branch
+        args: [--branch, master]
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: fix-encoding-pragma
+        args: ["--remove"]
+
+  - repo: https://gitlab.com/pycqa/flake8
+    rev: 3.8.3
+    hooks:
+      - id: flake8
+        additional_dependencies:
+          [
+            pep8-naming,
+            flake8-docstrings,
+            flake8-blind-except,
+          ]
+        args:
+          [
+            "--ignore=D10,D402,E266,N803,N806",
+            "--docstring-convention=numpy",
+            "--max-line-length=79",
+            "--per-file-ignores=__init__.py:F401",
+            "--extend-exclude=setup.py,build,docs/conf.py,examples,dist,htmlcov,.ipynb_checkpoints,.pytest_cache"
+          ]

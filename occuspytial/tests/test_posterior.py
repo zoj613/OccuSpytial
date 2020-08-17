@@ -8,7 +8,7 @@ from occuspytial.posterior import PosteriorParameter
 
 @pytest.mark.filterwarnings('ignore::UserWarning')
 def test_posterior():
-    c = Chain({'p1':  2, 'p2': 1}, size=2)
+    c = Chain({'p1': 2, 'p2': 1}, size=2)
     p = PosteriorParameter(c)
 
     with patch('occuspytial.posterior.az') as az:

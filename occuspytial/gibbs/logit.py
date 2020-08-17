@@ -107,8 +107,7 @@ class _EtaICARPosterior:
 
 
 class LogitICARGibbs(GibbsBase):
-
-    """Gibbs sampler using logit link and ICAR model for spatial random effects
+    r"""Gibbs sample using logit link and ICAR model for spatial random effects.
 
     Parameters
     ----------
@@ -190,8 +189,10 @@ class LogitICARGibbs(GibbsBase):
         self.dists.eta_post = _EtaICARPosterior(self.fixed.Q, self.rng)
 
     def _update_omega_a(self):
-        """Update the latent variable associated with the cofficients of the
-        conditional detection covariates.
+        """Update the latent variable ``omega_a``.
+
+        This variable is ssociated with the cofficients of the conditional
+        detection covariates.
         """
         # get occupancy state of the sites where species was not observed.
         not_obs_occupancy = [i for i in self.fixed.not_obs if self.state.z[i]]
@@ -202,8 +203,10 @@ class LogitICARGibbs(GibbsBase):
         self.state.omega_a = b
 
     def _update_omega_b(self):
-        """Update the latent variable associated with the cofficients of the
-        occupancy covariates.
+        """Update the latent variable ``omega_b``.
+
+        This variable is associated with the cofficients of the occupancy
+        covariates.
         """
         b = self.X @ self.state.beta + self.state.spatial
         self.dists.pg.rvs_arr(self.fixed.ones, b, b)
@@ -236,7 +239,7 @@ class LogitICARGibbs(GibbsBase):
         self.state.beta = self.dists.mvnorm.rvs(b, A)
 
     def _update_z(self):
-        """Update the occupancy state of each site"""
+        """Update the occupancy state of each site."""
         no = self.fixed.not_obs
         ns = self.fixed.not_surveyed
         beta = self.state.beta
@@ -256,9 +259,10 @@ class LogitICARGibbs(GibbsBase):
         self.state.k = self.state.z - 0.5
 
     def step(self):
-        """The steps taken to complete one gibbs sampler update. The method
-        should not be called directly. It is called internally by the
-        ``sample`` method.
+        """Complete one gibbs sampler update.
+
+        The method should not be called directly. It is called internally
+        by the ``sample`` method.
         """
         self._update_omega_b()
         self._update_tau()

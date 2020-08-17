@@ -1,6 +1,6 @@
 # OccuSpytial
 
-[![Documentation Status](https://readthedocs.org/projects/occuspytial/badge/?version=latest?style=shield)](https://occuspytial.readthedocs.io/en/latest/?badge=latest)
+[![Documentation Status](https://readthedocs.org/projects/occuspytial/badge/?version=latest)](https://occuspytial.readthedocs.io/en/latest/?badge=latest)
 [![codecov](https://codecov.io/gh/zoj613/OccuSpytial/branch/master/graph/badge.svg?style=shield)](https://codecov.io/gh/zoj613/OccuSpytial)
 [![zoj613](https://circleci.com/gh/zoj613/OccuSpytial.svg?style=shield)](https://circleci.com/gh/zoj613/OccuSpytial)
 ![PyPI - Python Version](https://img.shields.io/pypi/pyversions/OccuSpytial)

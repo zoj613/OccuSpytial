@@ -38,4 +38,3 @@ Development Utils
 
 .. autoclass:: occuspytial.gibbs.state.FixedState
     :members:
-

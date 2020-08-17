@@ -1,8 +1,8 @@
 from distutils.core import Extension
 from os.path import join
 
+from Cython.Build import build_ext, cythonize
 import numpy as np
-from Cython.Build import cythonize, build_ext
 
 
 # https://numpy.org/devdocs/reference/random/examples/cython/setup.py.html
@@ -27,9 +27,7 @@ extensions = [
 
 # source: https://github.com/sdispater/pendulum/blob/1.x/build.py
 def build(setup_kwargs):
-    """
-    This function is mandatory in order to build the extensions.
-    """
+    """Build extension modules."""
     setup_kwargs.update({
         'ext_modules': cythonize(
             extensions,

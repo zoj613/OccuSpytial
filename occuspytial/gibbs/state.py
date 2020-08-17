@@ -7,15 +7,14 @@ class BaseStorage(SimpleNamespace):
 
 
 class State(BaseStorage):
-    """Class to store parameter variables so they can be accessed as attributes
-    """
+    """Store parameter variables so they can be accessed as attributes."""
 
     def __iter__(self):
         yield from self.__dict__
 
 
 class FixedState(BaseStorage):
-    """Class to store parameter variables so they can be accessed as attributes
+    """Store parameter variables so they can be accessed as attributes.
 
     Values of variables assigned to an instance of this class cannot be changed
     Thus this class should be used for values that remain constant during

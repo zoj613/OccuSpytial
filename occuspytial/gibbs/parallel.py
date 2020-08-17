@@ -2,7 +2,7 @@ from joblib import Parallel, delayed
 
 
 def sample_parallel(class_, **kwargs):
-    """Utility function to perform sampling in parallel.
+    """Perform MCMC sampling in parallel.
 
     Parameters
     ----------

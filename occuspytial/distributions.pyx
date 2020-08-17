@@ -87,7 +87,7 @@ cdef class DenseMultivariateNormal(Distribution):
         rvs(mean, cov, overwrite_cov=True)
 
         Generate a random sample from a multivariate Gaussian distribution.
-        
+
         Parameters
         ----------
         mean : np.ndarray
@@ -253,7 +253,7 @@ cdef class PolyaGamma(Distribution):
     References
     ----------
     .. [1]  Windle, J., Polson, N. G., Scott, J. G.,. Sampling Polya-Gamma
-       random variates: alternate and approximate techniques (2014). arXiv 
+       random variates: alternate and approximate techniques (2014). arXiv
        e-prints arXiv:1405.0506.
     """
     cdef object rng_pg

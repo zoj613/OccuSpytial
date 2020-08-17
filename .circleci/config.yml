@@ -4,7 +4,7 @@ version: 2
 
 
 jobs:
-  build-and-test:
+  build-test-lint:
     docker:
       - image: circleci/python:3.6.10
     steps:
@@ -31,16 +31,21 @@ jobs:
           command: |
             poetry run pytest -v --cov=occuspytial occuspytial/ --cov-report=html
             poetry run codecov --token $CODECOV_TOKEN
-
       # build docs
       - run:
           name: Build docs
           command: |
             cd docs
             poetry run make html
+      # run style checks
+      - run:
+          name: linting
+          command: |
+            poetry run pre-commit run --all-files
+
 
 workflows:
   version: 2
   build-and-test-workflow:
     jobs:
-      - build-and-test
+      - build-test-lint
