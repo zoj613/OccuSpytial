@@ -6,7 +6,7 @@
 :github_url: https://github.com/zoj613/Occuspytial
 
 .. |codecov| image:: https://codecov.io/gh/zoj613/OccuSpytial/branch/master/graph/badge.svg?style=shield
-.. |Documentation| image:: https://readthedocs.org/projects/occuspytial/badge/?version=latest?style=shield
+.. |Documentation| image:: https://readthedocs.org/projects/occuspytial/badge/?version=latest
 .. |circleci| image:: https://circleci.com/gh/circleci/circleci-docs.svg?style=shield
 .. |pypi| image:: https://img.shields.io/pypi/pyversions/OccuSpytial
 .. |pypi ver| image:: https://img.shields.io/pypi/v/OccuSpytial
