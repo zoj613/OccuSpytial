@@ -3,7 +3,7 @@ from numpy.linalg import multi_dot
 from scipy.linalg import solve_triangular
 from scipy.special import ndtr, ndtri  # std norm cdf and its inverse
 
-from ..distributions import DenseMultivariateNormal2
+from ..distributions import GaussianMarkovRandomField
 
 from .base import GibbsBase
 
@@ -112,7 +112,7 @@ class ProbitRSRGibbs(GibbsBase):
         self.fixed.XTX_plus_bprec = self.X.T @ self.X + self.fixed.b_prec
         self.fixed.eps_chol_factor = np.ones(self.X.shape[0]) / np.sqrt(2)
         random_state = self.rng.integers(low=0, high=2 ** 63)
-        self.dists.mvnorm = DenseMultivariateNormal2(random_state)
+        self.dists.mvnorm = GaussianMarkovRandomField(random_state)
 
         # XTX_i = inv(self.X.T @ self.X)
         chol = np.linalg.cholesky(self.X.T @ self.X)

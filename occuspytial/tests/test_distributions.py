@@ -3,6 +3,7 @@ import pytest
 
 from occuspytial.distributions import (
     DenseMultivariateNormal,
+    GaussianMarkovRandomField,
     PolyaGamma,
 )
 
@@ -25,6 +26,26 @@ def test_dense_mvnorm():
     cov_copy = cov.copy()
     arr = d.rvs(mean, cov_copy, overwrite_cov=False)
     assert np.allclose(cov_copy, cov)
+
+
+def test_gaussian_markov_random_field():
+    d = GaussianMarkovRandomField()
+    mat = np.random.rand(5, 5)
+    prec_mat = np.linalg.inv(mat.T @ mat)
+    mean = np.array([0.] * 5)
+
+    prec_mat_copy = prec_mat.copy()
+    arr = d.rvs(mean, prec_mat_copy)
+
+    assert isinstance(arr, np.ndarray)
+    assert arr.ndim == 1
+    assert arr.shape[0] == 5
+    # check if input precision matrix was overwritten
+    assert not np.allclose(prec_mat, prec_mat_copy)
+
+    prec_mat_copy = prec_mat.copy()
+    arr = d.rvs(mean, prec_mat_copy, overwrite_prec=False)
+    assert np.allclose(prec_mat_copy, prec_mat_copy)
 
 
 def test_polyagamma():

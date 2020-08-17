@@ -6,20 +6,20 @@ List of Distributions
 .. autosummary::
 
     DenseMultivariateNormal
-    DenseMultivariateNormal2
+    GaussianMarkovRandomField
     PolyaGamma
 
 
 DenseMultivariateNormal
-------------------------
+-----------------------
 .. autoclass:: occuspytial.distributions.DenseMultivariateNormal
     :members:
     :show-inheritance:
 
 
-DenseMultivariateNormal2
-------------------------
-.. autoclass:: occuspytial.distributions.DenseMultivariateNormal2
+GaussianMarkovRandomField
+-------------------------
+.. autoclass:: occuspytial.distributions.GaussianMarkovRandomField
     :members:
     :show-inheritance:
 

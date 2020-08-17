@@ -10,7 +10,7 @@ from scipy.special import expit
 from ..distributions import (
     ensure_sums_to_zero,
     PolyaGamma,
-    DenseMultivariateNormal2
+    GaussianMarkovRandomField
 )
 
 from .base import GibbsBase
@@ -185,7 +185,7 @@ class LogitICARGibbs(GibbsBase):
 
         random_state = self.rng.integers(low=0, high=2 ** 63)
         self.dists.pg = PolyaGamma(random_state)
-        self.dists.mvnorm = DenseMultivariateNormal2(random_state)
+        self.dists.mvnorm = GaussianMarkovRandomField(random_state)
         self.dists.eta_post = _EtaICARPosterior(self.fixed.Q, self.rng)
 
     def _update_omega_a(self):
