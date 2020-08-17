@@ -23,7 +23,7 @@ From source
 Alternatively, it can be installed from source using `poetry <https://python-poetry.org>`_
 
 .. code-block:: bash
-    
+
     git clone https://github.com/zoj613/OccuSpytial.git
     cd OccuSpytial/
     poetry install
@@ -38,6 +38,5 @@ After installation, the unit tests can be ran from the project's root directory
 using
 
 .. code-block:: bash
-    
-    pytest -v
 
+    pytest -v

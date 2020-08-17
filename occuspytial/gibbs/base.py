@@ -13,7 +13,9 @@ from .state import State, FixedState
 
 
 class _GibbsState(State):
-    """Container to conveniently retrieve the posterior samples of the
+    """Posterior parameter state container.
+
+    This class is used to conveniently retrieve the posterior samples of the
     parameters of interest ('alpha', 'beta', 'tau') after each Gibbs sampler
     iteration.
     """
@@ -26,7 +28,6 @@ class _GibbsState(State):
 
 
 class GibbsBase:
-
     """Base class for Gibbs samplers of species spatial occupancy models.
 
     Parameters
@@ -163,7 +164,7 @@ class GibbsBase:
         self.dists = FixedState()
 
     def _verify_spatial_precision(self, Q):
-        """Check if Q is not singular by computing smallest eigenvalue"""
+        """Check if Q is not singular by computing smallest eigenvalue."""
         eig = eigsh(Q, k=1, which='SA', return_eigenvectors=False, sigma=0.001)
         if eig[0] >= 1e-4:
             raise ValueError('Spatial precision matrix Q must be singular.')
@@ -185,7 +186,7 @@ class GibbsBase:
         return params
 
     def _initialize_posterior_state(self, start=None):
-        """Set sampler starting values"""
+        """Set sampler starting values."""
         if start is None:
             self.state = self._initialize_default_start(self.state)
         else:
@@ -196,7 +197,7 @@ class GibbsBase:
             self.state.spatial = self.state.eta
 
     def _initialize_default_start(self, state):
-        """Used when starting values for the gibbs sampler are not given"""
+        """Set starting values for the gibbs sampler when not given."""
         state.tau = self.rng.gamma(0.5, 1 / self.fixed.tau_rate)
         eta = self.rng.standard_normal(self.fixed.n)
         eta = eta - eta.mean()
@@ -225,7 +226,7 @@ class GibbsBase:
         self._initialize_posterior_state(start)
         chain_params = {
             'alpha': self.state.alpha.size,
-            'beta':  self.state.beta.size,
+            'beta': self.state.beta.size,
             'tau': 1
         }
         self.chain = Chain(chain_params, size - burnin)
@@ -240,7 +241,7 @@ class GibbsBase:
         return self.chain
 
     def sample(self, size, burnin=0, start=None, chains=1, progressbar=True):
-        """Obtain posterior samples of the parameters of interest.
+        r"""Obtain posterior samples of the parameters of interest.
 
         Only parameters {``alpha``, ``beta``, ``tau``} are stored after
         sampling, meaning the conditional detection and occupancy covariate

@@ -9,20 +9,23 @@ from .base import GibbsBase
 
 
 def truncnorm_inf_ppf(a, p):
-    """Returns PPF from right hand tail of truncated normal distribution
-     (a, np.inf) for small |a|."""
+    """Return PPF from right hand tail of truncated normal distribution.
+
+    Return values from the inteval (a, np.inf) for small |a|.
+    """
     return -ndtri(ndtr(-a) * (1.0 - p))
 
 
 def truncnorm_neginf_ppf(b, p):
-    """Returns PPF from left hand tail of truncated normal distribution
-    (-np.inf, b) for small |b|."""
+    """Return PPF from left hand tail of truncated normal distribution.
+
+    Return values from the inteval (-np.inf, b) for small |b|.
+    """
     return ndtri(ndtr(b) * p)
 
 
 class ProbitRSRGibbs(GibbsBase):
-
-    """Sampler using probit link and RSR model for spatial random effects.
+    r"""Sampler using probit link and RSR model for spatial random effects.
 
     This algorithm is an implementation of the gibbs sampler in [1]_ where a
     Reduced Spatial Regression (RSR) model is used to account for spatial
@@ -96,6 +99,7 @@ class ProbitRSRGibbs(GibbsBase):
        Journal of Econometrics, 97(2), 227-259
 
     """
+
     def __init__(
         self, Q, W, X, y, hparams=None, random_state=None, r=0.5, q=None
     ):
@@ -169,8 +173,10 @@ class ProbitRSRGibbs(GibbsBase):
             self.state.spatial = self.fixed.K @ self.state.eta
 
     def _update_omega_a(self):
-        """Update the latent variable associated with the cofficients of the
-        conditional detection covariates.
+        """Update the latent variable ``omega_a``.
+
+        This variable is ssociated with the cofficients of the conditional
+        detection covariates.
         """
         # get occopancy state of the sites where species was not observed.
         not_obs_occupancy = [i for i in self.fixed.not_obs if self.state.z[i]]
@@ -190,8 +196,10 @@ class ProbitRSRGibbs(GibbsBase):
         self.state.omega_a[~obs_mask] = truncnorm_neginf_ppf(-b, Ub) + b
 
     def _update_omega_b(self):
-        """Update the latent variable associated with the cofficients of the
-        occupancy covariates.
+        """Update the latent variable ``omega_b``.
+
+        This variable is associated with the cofficients of the occupancy
+        covariates.
         """
         loc = self.X @ self.state.beta + self.state.spatial + self.state.eps
         exist_mask = (self.state.z == 1)

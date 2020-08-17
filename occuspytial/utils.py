@@ -113,7 +113,7 @@ def make_data(
     tau_range=(0.25, 1.5),
     max_neighbors=8,
     random_state=None,
- ):
+):
     """Generate random data to use for modelling species occupancy.
 
     Parameters
