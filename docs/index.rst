@@ -5,12 +5,21 @@
 
 :github_url: https://github.com/zoj613/Occuspytial
 
+.. |codecov| image:: https://codecov.io/gh/zoj613/OccuSpytial/branch/master/graph/badge.svg?style=shield
+.. |Documentation| image:: https://readthedocs.org/projects/occuspytial/badge/?version=latest?style=shield
+.. |circleci| image:: https://circleci.com/gh/circleci/circleci-docs.svg?style=shield
+.. |pypi| image:: https://img.shields.io/pypi/pyversions/OccuSpytial
+.. |pypi ver| image:: https://img.shields.io/pypi/v/OccuSpytial
+.. |license| image:: https://img.shields.io/pypi/l/OccuSpytial
+
 Welcome to OccuSpytial's documentation!
 =======================================
 
+|codecov| |Documentation| |circleci| |pypi| |pypi ver| |license|
+
 ``OccuSpytial`` is a library for performing bayesian inference of single-season
 site occupancy models. A species occupancy model is used to account for imperfect
-detection of a species in surveys and to determine the probability of occupancy 
+detection of a species in surveys and to determine the probability of occupancy
 :math:`(\psi_i)` at each site. This is done by quantifying the conditional
 detection probability :math:`(d_{ij})` of a species at a site based off of data.
 This library specifically implements models that take into account the spatial
@@ -19,7 +28,7 @@ autocorrelation between between neighboring sites for the occupancy covariates.
 The basic formulation of the model as shown by `Rorazio and Royle (2008) <https://tinyurl.com/y7pb4sg6>`_ is:
 
 .. math::
-   
+
    \begin{align}
       \begin{split}
          z_i|\psi_i \sim& \text{ Bernoulli}(\psi_i)\\
@@ -43,7 +52,7 @@ For more information about the currently implemented methods, see :ref:`samplers
 and use C code (via Cython) for computationally intensive parts of each algorithm.
 
 .. todo::
-   
+
    - Implement a Hamiltonian Monte Carlo sampler variant.
 
 
