@@ -20,7 +20,7 @@ from scipy.linalg.cython_lapack cimport dpotrf
 
 __all__ = (
     'DenseMultivariateNormal',
-    'DenseMultivariateNormal2',
+    'GaussianMarkovRandomField',
     'PolyaGamma',
 )
 
@@ -132,8 +132,8 @@ cdef class DenseMultivariateNormal(Distribution):
         return out
 
 
-cdef class DenseMultivariateNormal2(Distribution):
-    """Multivariate Gaussian distribution for dense precision matrices.
+cdef class GaussianMarkovRandomField(Distribution):
+    """Gaussian distribution parametrized by it's precision matrix.
 
     The Guassian distribution is of the form
 
