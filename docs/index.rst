@@ -9,13 +9,14 @@
 .. |Documentation| image:: https://readthedocs.org/projects/occuspytial/badge/?version=latest
 .. |circleci| image:: https://circleci.com/gh/circleci/circleci-docs.svg?style=shield
 .. |pypi| image:: https://img.shields.io/pypi/pyversions/OccuSpytial
-.. |pypi ver| image:: https://img.shields.io/pypi/v/OccuSpytial
-.. |license| image:: https://img.shields.io/pypi/l/OccuSpytial
+.. |pypiver| image:: https://img.shields.io/pypi/v/OccuSpytial
+.. |licensing| image:: https://img.shields.io/pypi/l/OccuSpytial
 
 Welcome to OccuSpytial's documentation!
 =======================================
 
-|codecov| |Documentation| |circleci| |pypi| |pypi ver| |license|
+|codecov|  |Documentation|  |circleci|  |pypi|  |pypiver|  |licensing|
+
 
 ``OccuSpytial`` is a library for performing bayesian inference of single-season
 site occupancy models. A species occupancy model is used to account for imperfect
