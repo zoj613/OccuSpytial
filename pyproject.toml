@@ -17,7 +17,7 @@ include = ["occuspytial/**/*.c"]
 build = "build.py"
 
 [tool.poetry.dependencies]
-python = "^3.6"
+python = "^3.6.1"
 pypolyagamma = "^1.2.3"
 scipy = "^1.5.1"
 joblib = "^0.14.0"
@@ -31,10 +31,11 @@ nbsphinx = {version = "*", optional = true}
 sphinx_rtd_theme = {version = "*", optional = true}
 numpydoc  = {version = "*", optional = true}
 jupyter = {version = "*", optional = true}
+pypandoc = {version = "^1.5", optional = true}
 
 
 [tool.poetry.extras]
-docs = ["sphinx", "nbsphinx", "sphinx_rtd_theme", "numpydoc", "jupyter"]
+docs = ["sphinx", "nbsphinx", "sphinx_rtd_theme", "numpydoc", "jupyter", "pypandoc"]
 
 
 [tool.poetry.dev-dependencies]
@@ -42,6 +43,8 @@ pytest = "^5.2"
 pytest-cov = "*"
 Cython = "^0.29.20"
 toml = "*"
+pre-commit = "^2.6.0"
+codecov = "^2.1.8"
 
 
 [build-system]
