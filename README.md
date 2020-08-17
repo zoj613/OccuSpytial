@@ -1,5 +1,12 @@
 # OccuSpytial
 
+[![Documentation Status](https://readthedocs.org/projects/occuspytial/badge/?version=latest?style=shield)](https://occuspytial.readthedocs.io/en/latest/?badge=latest)
+[![codecov](https://codecov.io/gh/zoj613/OccuSpytial/branch/master/graph/badge.svg?style=shield)](https://codecov.io/gh/zoj613/OccuSpytial)
+[![zoj613](https://circleci.com/gh/zoj613/OccuSpytial.svg?style=shield)](https://circleci.com/gh/zoj613/OccuSpytial)
+![PyPI - Python Version](https://img.shields.io/pypi/pyversions/OccuSpytial)
+![PyPI](https://img.shields.io/pypi/v/OccuSpytial)
+![PyPI - License](https://img.shields.io/pypi/l/OccuSpytial)
+
 A package for fast bayesian analysis of spatial occupancy models. OccuSpytial implements
 several samplers for the single season site spatial occupancy model using the Intrinsic Conditional Autoregressive (ICAR) model for spatial random effects.
 
