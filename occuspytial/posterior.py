@@ -4,6 +4,29 @@ import numpy as np
 az.style.use("arviz-darkgrid")
 
 
+_DOCSTRING_TEMPLATE = """
+
+    See arviz library documentation for a full list of legal parameters.
+
+    Parameters
+    ----------
+    **kwargs
+        Keyword arguments optionally passed to ``{}``.
+
+    Returns
+    -------
+    axes : matplotlib axes
+""".format
+
+
+def _append_template_docstring(arviz_name):
+    """Append formatted template string to method's docstring."""
+    def wrapper(obj):
+        obj.__doc__ = obj.__doc__.join((_DOCSTRING_TEMPLATE(arviz_name),))
+        return obj
+    return wrapper
+
+
 class PosteriorParameter:
     """Container to store posterior samples, produce plots and summaries.
 
@@ -52,84 +75,29 @@ class PosteriorParameter:
         """
         return az.summary(self.data)
 
+    @_append_template_docstring('arviz.plot_trace')
     def plot_trace(self, **kwargs):
-        """Plot density and samples values of parameters.
-
-        See arviz library documentation for a full list of legal parameters.
-
-        Parameters
-        ----------
-        **kwargs
-            Keyword arguments optionally passed to ``arviz.plot_trace``
-
-        Returns
-        -------
-        axes : matplotlib axes
-        """
+        """Plot density and samples values of parameters."""
         return az.plot_trace(self.data, **kwargs)
 
+    @_append_template_docstring('arviz.plot_autocorr')
     def plot_auto_corr(self, **kwargs):
-        """Plot the autocorrelation function of each posterior parameter.
-
-        See arviz library documentation for a full list of legal parameters.
-
-        Parameters
-        ----------
-        **kwargs
-            Keyword arguments optionally passed to ``arviz.plot_autocorr``
-
-        Returns
-        -------
-        axes : matplotlib axes
-        """
+        """Plot the autocorrelation function of each posterior parameter."""
         return az.plot_autocorr(self.data, **kwargs)
 
+    @_append_template_docstring('arviz.plot_pair')
     def plot_pair(self, **kwargs):
-        """Pair plots of the posterior parameters.
-
-        See arviz library documentation for a full list of legal parameters.
-
-        Parameters
-        ----------
-        **kwargs
-            Keyword arguments optionally passed to ``arviz.plot_pair``.
-
-        Returns
-        -------
-        axes : matplotlib axes
-        """
+        """Pair plots of the posterior parameters."""
         return az.plot_pair(self.data, **kwargs)
 
+    @_append_template_docstring('arviz.plot_posterior')
     def plot_density(self, **kwargs):
-        """Plot Posterior densities in the style of John K. Kruschke’s book.
-
-        See arviz library documentation for a full list of legal parameters.
-
-        Parameters
-        ----------
-        **kwargs
-            Keyword arguments optionally passed to `arviz.plot_posterior`
-
-        Returns
-        -------
-        axes : matplotlib axes
-        """
+        """Plot Posterior densities in the style of John K. Kruschke’s book."""
         return az.plot_posterior(self.data, **kwargs)
 
+    @_append_template_docstring('arviz.plot_ess')
     def plot_ess(self, **kwargs):
-        """Plot quantile, local or evolution of effective sample sizes (ESS).
-
-        See arviz library documentation for a full list of legal parameters.
-
-        Parameters
-        ----------
-        **kwargs
-            Keyword arguments optionally passed to `arviz.plot_ess`
-
-        Returns
-        -------
-        axes : matplotlib axes
-        """
+        """Plot quantile, local or evolution of effective sample size (ESS)."""
         return az.plot_ess(self.data, **kwargs)
 
     def __getitem__(self, name):
