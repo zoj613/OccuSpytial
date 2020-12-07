@@ -1,37 +1,31 @@
 from distutils.core import Extension
 from os.path import join
 
-from Cython.Build import build_ext, cythonize
 import numpy as np
 
+
+include_dirs = [np.get_include()]
+macros = [('NPY_NO_DEPRECATED_API', 0)]
 
 # https://numpy.org/devdocs/reference/random/examples/cython/setup.py.html
 extensions = [
     Extension(
         "occuspytial.distributions",
-        ["occuspytial/distributions.pyx"],
-        include_dirs=[np.get_include()],
+        ["occuspytial/distributions.c"],
+        include_dirs=include_dirs,
         library_dirs=[join(np.get_include(), '..', '..', 'random', 'lib')],
         libraries=['npyrandom'],
-        define_macros=[('NPY_NO_DEPRECATED_API', 0)],
+        define_macros=macros,
     ),
     Extension(
         "occuspytial.data",
-        ["occuspytial/data.pyx"],
-        include_dirs=[np.get_include()],
-        library_dirs=[np.get_include()],
-        define_macros=[('NPY_NO_DEPRECATED_API', 0)],
+        ["occuspytial/data.c"],
+        include_dirs=include_dirs,
+        define_macros=macros,
     ),
 ]
 
 
-# source: https://github.com/sdispater/pendulum/blob/1.x/build.py
 def build(setup_kwargs):
     """Build extension modules."""
-    setup_kwargs.update({
-        'ext_modules': cythonize(
-            extensions,
-            compiler_directives={'embedsignature': True}
-        ),
-        'cmdclass': {'build_ext': build_ext}
-    })
+    setup_kwargs.update(ext_modules=extensions)

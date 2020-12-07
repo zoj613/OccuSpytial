@@ -13,8 +13,13 @@ keywords = [
     'occupancy prediction',
     'Species Occupancy'
 ]
-include = ["occuspytial/**/*.c"]
-build = "build.py"
+include = [{path = "occuspytial/*.c", format = "sdist"}]
+exclude = ["tests", "occuspytial/**/tests", "occuspytial/**/*.pyx"]
+
+
+[tool.poetry.build]
+script = "build.py"
+
 
 [tool.poetry.dependencies]
 python = "^3.6.1"
@@ -48,5 +53,5 @@ codecov = "^2.1.8"
 
 
 [build-system]
-requires = ["poetry>=0.12", "Cython>=0.29.20", "numpy>=1.19.0", "scipy>=1.5.1"]
-build-backend = "poetry.masonry.api"
+requires = ["poetry-core>=1.0.0a9", "numpy>=1.19.0", "setuptools", "wheel"]
+build-backend = "poetry.core.masonry.api"
