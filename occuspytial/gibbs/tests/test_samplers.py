@@ -54,7 +54,7 @@ def test_turning_off_progressbar(capfd):
 @parametrized_samplers
 def test_gibbs_samplers(sampler_class):
     s = sampler_class(Q, W, X, y, random_state=10)
-    samples = s.sample(5)
+    samples = s.sample(5, chains=1)
     # test if correct number of samples is generated per parameter
     assert samples['alpha'].shape == (1, 5, 2)
     assert samples['beta'].shape == (1, 5, 3)
@@ -62,7 +62,7 @@ def test_gibbs_samplers(sampler_class):
 
     # test reproducability through random_state
     s = sampler_class(Q, W, X, y, random_state=10)
-    samples2 = s.sample(5)
+    samples2 = s.sample(5, chains=1)
     assert np.allclose(samples2['alpha'], samples['alpha'])
     assert np.allclose(samples2['beta'], samples['beta'])
     assert np.allclose(samples2['tau'], samples['tau'])
@@ -74,7 +74,7 @@ def test_gibbs_samplers(sampler_class):
     # test if burnin works as intended
     with pytest.raises(ValueError, match='burnin value cannot be larger than'):
         s.sample(10, burnin=11)
-    samples = s.sample(10, burnin=3)
+    samples = s.sample(10, burnin=3, chains=1)
     assert samples['alpha'].shape == (1, 7, 2)
     assert samples['beta'].shape == (1, 7, 3)
     assert samples['tau'].shape == (1, 7)

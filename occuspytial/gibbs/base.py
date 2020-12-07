@@ -212,7 +212,7 @@ class GibbsBase:
         return state
 
     def _run(
-        self, size, burnin=0, start=None, chains=1, progressbar=True, pos=0
+        self, size, burnin=0, start=None, chains=2, progressbar=True, pos=0
     ):
         """Contains the sampler's logic for obtaining posterior samples.
 
@@ -240,7 +240,7 @@ class GibbsBase:
 
         return self.chain
 
-    def sample(self, size, burnin=0, start=None, chains=1, progressbar=True):
+    def sample(self, size, burnin=0, start=None, chains=2, progressbar=True):
         r"""Obtain posterior samples of the parameters of interest.
 
         Only parameters {``alpha``, ``beta``, ``tau``} are stored after
