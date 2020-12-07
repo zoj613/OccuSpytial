@@ -19,7 +19,7 @@ curl -sSL https://raw.githubusercontent.com/python-poetry/poetry/master/get-poet
 
 function build_poetry_wheels
 {
-    # build wheels for 3.6-3.8 with poetry 
+    # build wheels for 3.6-3.8 with poetry
     for BIN in "${bin_arr[@]}"; do
         rm -Rf build/*
         # install build requirement before building the wheel
