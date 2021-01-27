@@ -301,6 +301,6 @@ class GibbsBase:
         out = type(self).__new__(self.__class__)
         out.__dict__.update(self.__dict__)
         # make sure the copy has its own unique random number generator
-        random_state = self.rng.integers(low=0, high=2 ** 63)
-        out.__dict__['rng'] = get_generator(random_state)
+        seed_seq = self.rng._bit_generator._seed_seq.spawn(1)[0]
+        out.__dict__['rng'] = get_generator(seed_seq)
         return out

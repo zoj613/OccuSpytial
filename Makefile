@@ -17,6 +17,9 @@ clean:
 cythonize:
 	cythonize occuspytial/*.pyx
 
+install: clean cythonize
+	poetry install
+
 sdist: cythonize
 	poetry build -f sdist
 

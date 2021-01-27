@@ -3,218 +3,30 @@
 #cython: wraparound=False
 #cython: nonecheck=False
 #cython: cdivision=True
-from numbers import Number
+from cpython.pycapsule cimport PyCapsule_GetPointer
 
-from cpython.pycapsule cimport PyCapsule_IsValid, PyCapsule_GetPointer
 import numpy as np
 cimport numpy as np
 from numpy.random cimport BitGenerator, bitgen_t
-from numpy.random.c_distributions cimport (
-    random_standard_normal_fill, random_positive_int64
-)
+from numpy.random.c_distributions cimport random_standard_normal_fill
 
-from scipy.linalg.cython_blas cimport dtrmv, dtrsv
-from scipy.linalg.cython_lapack cimport dpotrf
+from scipy.linalg.cython_blas cimport dtrmv
+from scipy.linalg.cython_lapack cimport dpotrf, dpotrs
 
 
-__all__ = ('DenseMultivariateNormal', 'GaussianMarkovRandomField')
+__all__ = ('precision_mvnorm', 'ensure_sums_to_zero')
 
 np.import_array()
 
-cdef const char* CHOLESKY_FAILURE = 'Cholesky factorization failed!'
+cdef const char* FAILURE_MESSAGE = "Cholesky factorization/solver failed!"
 
 
-cdef class Distribution:
-    """Base class to serve as an informal interface for distributions.
-
-    Implementations can inherit from this class, so it should never be used
-    directly.
-    """
-
-    cdef object random_state
-    cdef object bitgen
-    cdef bitgen_t* rng
-    cdef object lock
-
-    def __cinit__(self, random_state=None):
-        self.bitgen = np.random.SFC64(random_state)
-        cdef const char* capsule_name = 'BitGenerator'
-        capsule = self.bitgen.capsule
-
-        if not PyCapsule_IsValid(capsule, capsule_name):
-            raise ValueError("Invalid pointer to anon_func_state")
-
-        self.rng = <bitgen_t*>PyCapsule_GetPointer(capsule, capsule_name)
-        self.random_state = random_state
-
-    def __reduce__(self):
-        return self.__class__, (self.random_state,)
-
-
-cdef class DenseMultivariateNormal(Distribution):
-    """Multivariate Gaussian distribution for dense covariance matrices.
-
-    Parameters
-    ----------
-    random_state : {None, int, numpy.random.SeedSequence}
-        A seed to initialize the random number generator. Defaults to None.
-
-    Methods
-    -------
-    rvs(mean, cov, overwrite_cov=True)
-    """
-
-    cdef inline void crvs(self, double* mean, double* cov, double* out, int* info, int* n) nogil:
-        cdef:
-            Py_ssize_t i
-            int incx = 1
-
-        # LAPACK cholesky decomposition
-        dpotrf('U', n, cov, n, info)
-        random_standard_normal_fill(self.rng, <np.npy_intp>n[0], out)
-        # BLAS matrix-vector product
-        dtrmv('U', 'T', 'N', n, cov, n, out, &incx)
-        for i in range(n[0]):
-            out[i] += mean[i]
-
-    def rvs(self, double[::1] mean, double[:, ::1] cov, bint overwrite_cov=True):
-        """
-        rvs(mean, cov, overwrite_cov=True)
-
-        Generate a random sample from a multivariate Gaussian distribution.
-
-        Parameters
-        ----------
-        mean : np.ndarray
-            Mean of the distribution
-        cov : np.ndarray
-            Covariance matrix of the distribution.
-        overwrite_cov : bool
-            Whether to write over the `cov` array when computing the cholesky
-            factor instead of creating a new array. Defaults to True.
-
-        Returns
-        -------
-        out : np.ndarray
-            A random sample from a multivariate Gaussian with mean vector
-            and covariance specified by `mean` and `cov`.
-        factor : np.ndarray
-            The cholesky factor of the covariance matrix :math:`\mathbf{U}`
-            such that :math:`\mathbf{U^TU} = \mathbf{A}`. All the data is in
-            the upper triangular part of the array, The lower triangular part
-            of the array is garbage values.
-
-        """
-        cdef:
-            np.npy_intp* dims = <np.npy_intp*>(mean.shape)
-            out = np.PyArray_EMPTY(1, dims, np.NPY_DOUBLE, 1)
-            double[::1] out_v = out
-            double[::1, :] chol
-            int n = out_v.shape[0]
-            int info
-
-        if not overwrite_cov:
-            a = np.PyArray_NewCopy(<np.ndarray>cov.base, np.NPY_FORTRANORDER)
-            chol = a
-        else:
-            chol = cov.T
-
-        self.crvs(&mean[0], &chol[0, 0], &out_v[0], &info, &n)
-
-        if info:
-            raise RuntimeError(CHOLESKY_FAILURE)
-
-        return out
-
-
-cdef class GaussianMarkovRandomField(Distribution):
-    """Gaussian distribution parametrized by it's precision matrix.
-
-    The Guassian distribution is of the form
-
-    .. math::
-
-        \mathcal{N}(\mathbf{\Lambda}^{-1}\mathbf{b}, \mathbf{\Lambda}^{-1})
-
-    In most cases only :math:`\mathbf{\Lambda}` and :math:`\mathbf{b}` are
-    available. This class facilitates sampling from a Gaussian of this form.
-
-    Parameters
-    ----------
-    random_state : {None, int, numpy.random.SeedSequence}
-        A seed to initialize the random number generator. Defaults to None.
-
-    Methods
-    -------
-    rvs(mean, prec, overwrite_prec=True)
-    """
-
-    cdef DenseMultivariateNormal mvnorm
-
-    def __cinit__(self, random_state=None):
-        self.mvnorm = DenseMultivariateNormal(random_state)
-
-    def rvs(self, double[::1] b, double[:, ::1] prec, bint overwrite_prec=True):
-        """
-        rvs(mean, prec, overwite_prec=True)
-
-        Generate a random draw from this distribution.
-
-        Parameters
-        ----------
-        b : np.ndarray
-            The :math:`b` component of the distribution's mean.
-        prec : np.ndarray
-            The precision matrix of the distribution (inverse of the covariance
-            matrix).
-        overwrite_cov : bool
-            Whether to write over the `prec` array when computing the cholesky
-            factor instead of creating a new array. Defaults to True.
-
-        Returns
-        -------
-        out : np.ndarray
-            A random variable from this distribution.
-
-        """
-        cdef:
-            np.npy_intp* dims = <np.npy_intp*>(b.shape)
-            out = np.PyArray_EMPTY(1, dims, np.NPY_DOUBLE, 1)
-            double[::1] out_v = out
-            double[::1, :] chol
-            int n = b.shape[0]
-            int incx = 1
-            int info
-
-        if not overwrite_prec:
-            a = np.PyArray_NewCopy(<np.ndarray>prec.base, np.NPY_FORTRANORDER)
-            chol = a
-        else:
-            chol = prec.T
-
-        self.mvnorm.crvs(&b[0], &chol[0, 0], &out_v[0], &info, &n)
-
-        if info:
-            raise RuntimeError(CHOLESKY_FAILURE)
-
-        with nogil:
-            # BLAS triangular matrix direct solver
-            dtrsv('U', 'T', 'N', &n, &chol[0, 0], &n, &out_v[0], &incx)
-            dtrsv('U', 'N', 'N', &n, &chol[0, 0], &n, &out_v[0], &incx)
-
-        return out
-
-
-def ensure_sums_to_zero(
-    double[::1] x, double[::1] z, double[::1] out, int size
-):
+def ensure_sums_to_zero(double[::1] x, double[::1] z, double[::1] out):
     """Utility function used when sampling from normal distribution truncated
     on the hyperplace sum(x) = 0.
     """
-    cdef:
-        Py_ssize_t i
-        double x_sum = 0, z_sum = 0
-        double a
+    cdef Py_ssize_t i, size = out.shape[0]
+    cdef double a, x_sum = 0, z_sum = 0
 
     with nogil:
         for i in range(size):
@@ -225,3 +37,74 @@ def ensure_sums_to_zero(
 
         for i in range(size):
             out[i] = x[i] + a * z[i]
+
+
+def precision_mvnorm(double[::1] b, double[:, ::1] prec, random_state=None):
+    """
+    precision_mvnorm(mean, prec, random_state=None)
+
+    Generate a sample from a gaussian distribution parametrized by its precision.
+
+    The Guassian distribution is of the form
+
+    .. math::
+
+        \mathcal{N}(\mathbf{\Lambda}^{-1}\mathbf{b}, \mathbf{\Lambda}^{-1})
+
+    In most cases only :math:`\mathbf{\Lambda}` and :math:`\mathbf{b}` are
+    available. This function facilitates sampling from a Gaussian of this form.
+
+    Parameters
+    ----------
+    b : np.ndarray
+        The :math:`b` component of the distribution's mean.
+    prec : np.ndarray
+        The precision matrix of the distribution (inverse of the covariance
+        matrix). The values are overwitten internally in order to store its
+        cholesky factor.
+    random_state : {None, int, array_like[ints], SeedSequence, BitGenerator, Generator}, optional
+    A seed to initialize the random number generator. If None, then fresh,
+    unpredictable entropy will be pulled from the OS. If an ``int`` or
+    ``array_like[ints]`` is passed, then it will be passed to
+    `SeedSequence` to derive the initial `BitGenerator` state. One may also
+    pass in a `SeedSequence` instance.
+    Additionally, when passed a `BitGenerator`, it will be wrapped by
+    `Generator`. If passed a `Generator`, it will be returned unaltered.
+
+    Returns
+    -------
+    out : np.ndarray
+        A random variable from this distribution.
+
+    """
+    cdef BitGenerator bitgenerator
+    cdef bitgen_t* bitgen
+    cdef np.npy_intp dims
+    cdef Py_ssize_t i
+    cdef double[::1] out
+    cdef double[::1, :] chol
+    cdef int info = 0, n = b.shape[0], incx = 1
+
+    bitgenerator = np.random.default_rng(random_state)._bit_generator
+    bitgen = <bitgen_t*>PyCapsule_GetPointer(bitgenerator.capsule, "BitGenerator")
+
+    chol = prec.T  # change the precision to Fortran order for use with LAPACK.
+    dims = <np.npy_intp>(b.shape[0])
+    out = np.PyArray_EMPTY(1, &dims, np.NPY_DOUBLE, 1)
+
+    with bitgenerator.lock, nogil:
+        random_standard_normal_fill(bitgen, <np.npy_intp>n, &out[0])
+
+    with nogil:
+        # LAPACK cholesky decomposition
+        dpotrf('U', &n, &chol[0, 0], &n, &info)
+        # BLAS matrix-vector product
+        dtrmv('U', 'T', 'N', &n, &chol[0, 0], &n, &out[0], &incx)
+        for i in range(n):
+            out[i] += b[i]
+        dpotrs('U', &n, &incx, &chol[0, 0], &n, &out[0], &n, &info)
+
+    if info:
+        raise RuntimeError(FAILURE_MESSAGE)
+
+    return out.base

@@ -3,7 +3,7 @@ from numpy.linalg import multi_dot
 from scipy.linalg import solve_triangular
 from scipy.special import ndtr, ndtri  # std norm cdf and its inverse
 
-from ..distributions import GaussianMarkovRandomField
+from ..distributions import precision_mvnorm
 
 from .base import GibbsBase
 
@@ -111,8 +111,6 @@ class ProbitRSRGibbs(GibbsBase):
         self.state.omega_b = np.zeros(self.fixed.n)
         self.fixed.XTX_plus_bprec = self.X.T @ self.X + self.fixed.b_prec
         self.fixed.eps_chol_factor = np.ones(self.X.shape[0]) / np.sqrt(2)
-        random_state = self.rng.integers(low=0, high=2 ** 63)
-        self.dists.mvnorm = GaussianMarkovRandomField(random_state)
 
         # XTX_i = inv(self.X.T @ self.X)
         chol = np.linalg.cholesky(self.X.T @ self.X)
@@ -227,20 +225,20 @@ class ProbitRSRGibbs(GibbsBase):
         eps = self.state.eps
         A = self.fixed.KTK + self.state.tau * self.fixed.Q
         b = K.T @ (self.state.omega_b - self.X @ self.state.beta - eps)
-        self.state.eta = self.dists.mvnorm.rvs(b, A)
+        self.state.eta = precision_mvnorm(b, A, self.rng)
         self.state.spatial = self.fixed.K @ self.state.eta
 
     def _update_alpha(self):
         WT = self.state.W.T
         A = WT @ WT.T + self.fixed.a_prec
         b = self.fixed.a_prec_by_mu + WT @ self.state.omega_a
-        self.state.alpha = self.dists.mvnorm.rvs(b, A)
+        self.state.alpha = precision_mvnorm(b, A, self.rng)
 
     def _update_beta(self):
         b = self.fixed.b_prec_by_mu + self.X.T @ (
             self.state.omega_b - self.state.spatial - self.state.eps
         )
-        self.state.beta = self.dists.mvnorm.rvs(b, self.fixed.XTX_plus_bprec)
+        self.state.beta = precision_mvnorm(b, self.fixed.XTX_plus_bprec, self.rng)
 
     def _update_z(self):
         no = self.fixed.not_obs
