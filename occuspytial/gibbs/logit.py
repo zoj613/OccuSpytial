@@ -2,16 +2,13 @@ from math import sqrt
 
 import numpy as np
 from numpy.linalg import multi_dot
+from polyagamma import polyagamma
 from scipy.linalg import solve_triangular
 from scipy.sparse import block_diag
 from scipy.sparse.linalg import minres
 from scipy.special import expit
 
-from ..distributions import (
-    ensure_sums_to_zero,
-    PolyaGamma,
-    GaussianMarkovRandomField
-)
+from ..distributions import ensure_sums_to_zero, GaussianMarkovRandomField
 
 from .base import GibbsBase
 
@@ -184,7 +181,6 @@ class LogitICARGibbs(GibbsBase):
         super()._configure(Q, hparams)
 
         random_state = self.rng.integers(low=0, high=2 ** 63)
-        self.dists.pg = PolyaGamma(random_state)
         self.dists.mvnorm = GaussianMarkovRandomField(random_state)
         self.dists.eta_post = _EtaICARPosterior(self.fixed.Q, self.rng)
 
@@ -199,8 +195,9 @@ class LogitICARGibbs(GibbsBase):
         self.state.exists = self.fixed.obs + not_obs_occupancy
         self.state.W = self.W[self.state.exists]
         b = self.state.W @ self.state.alpha
-        self.dists.pg.rvs_arr(np.ones_like(b), b, b)
-        self.state.omega_a = b
+        self.state.omega_a = polyagamma(
+            1, b, disable_checks=True, random_state=self.rng
+        )
 
     def _update_omega_b(self):
         """Update the latent variable ``omega_b``.
@@ -209,8 +206,9 @@ class LogitICARGibbs(GibbsBase):
         covariates.
         """
         b = self.X @ self.state.beta + self.state.spatial
-        self.dists.pg.rvs_arr(self.fixed.ones, b, b)
-        self.state.omega_b = b
+        self.state.omega_b = polyagamma(
+            1, b, disable_checks=True, random_state=self.rng
+        )
 
     def _update_tau(self):
         eta = self.state.eta

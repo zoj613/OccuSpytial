@@ -22,10 +22,3 @@ GaussianMarkovRandomField
 .. autoclass:: occuspytial.distributions.GaussianMarkovRandomField
     :members:
     :show-inheritance:
-
-
-PolyaGamma
-----------
-.. autoclass:: occuspytial.distributions.PolyaGamma
-    :members: rvs
-    :show-inheritance:
