@@ -76,7 +76,6 @@ and use C code (via Cython) for computationally intensive parts of each algorith
    :caption: API Reference
 
    samplers
-   distributions
    utils
 
 

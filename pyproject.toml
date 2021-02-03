@@ -23,12 +23,11 @@ script = "build.py"
 
 [tool.poetry.dependencies]
 python = "^3.6.1"
-pypolyagamma = "^1.2.3"
 scipy = "^1.5.1"
 joblib = "^0.14.0"
 numpy = "^1.19.0"
 tqdm = "^4.46.1"
-arviz = "^0.9.0"
+arviz = "^0.11"
 libpysal = "*"
 
 sphinx = {version = "^3", optional = true}
@@ -37,6 +36,7 @@ sphinx_rtd_theme = {version = "*", optional = true}
 numpydoc  = {version = "*", optional = true}
 jupyter = {version = "*", optional = true}
 pypandoc = {version = "^1.5", optional = true}
+polyagamma = "^1.0.0"
 
 
 [tool.poetry.extras]

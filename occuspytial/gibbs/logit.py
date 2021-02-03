@@ -2,16 +2,13 @@ from math import sqrt
 
 import numpy as np
 from numpy.linalg import multi_dot
+from polyagamma import polyagamma
 from scipy.linalg import solve_triangular
 from scipy.sparse import block_diag
 from scipy.sparse.linalg import minres
 from scipy.special import expit
 
-from ..distributions import (
-    ensure_sums_to_zero,
-    PolyaGamma,
-    GaussianMarkovRandomField
-)
+from ..distributions import ensure_sums_to_zero, precision_mvnorm
 
 from .base import GibbsBase
 
@@ -23,9 +20,6 @@ class _EtaICARPosterior:
     ----------
     Q : scipy sparse matrix
         ICAR precision matrix
-    random_gen : numpy.random.Generator
-        Instance of numpy's Generator class, which exposes a number of random
-        number generating methods.
 
     Methods
     -------
@@ -67,19 +61,18 @@ class _EtaICARPosterior:
            :math:`\mathbf{r}` is :math:`\mathbf{0}`.
     """
 
-    def __init__(self, Q, random_gen):
+    def __init__(self, Q):
         self._block_Q = block_diag((Q, Q), format='csc')
         s, u = np.linalg.eigh(Q.toarray())
         self._eigen = u[:, 1:] * np.sqrt(s[1:])
-        self._rng = random_gen
         self._n = Q.shape[0]
         self._rhs = np.ones(self._n * 2)
         self._n_plus_k = self._n + self._eigen.shape[1]
         self._guess = None
 
-    def rvs(self, b, omega, tau):
+    def rvs(self, b, omega, tau, random_state):
         """Generate a random draw from this distribution."""
-        eps = self._rng.standard_normal(self._n_plus_k)
+        eps = random_state.standard_normal(self._n_plus_k)
         rnorm1 = np.sqrt(omega) * eps[:self._n]
         rnorm2 = self._eigen @ (sqrt(tau) * eps[self._n:])
         out = b + rnorm1 + rnorm2
@@ -101,7 +94,7 @@ class _EtaICARPosterior:
         x = xz[:self._n]
         z = xz[self._n:]
 
-        ensure_sums_to_zero(x, z, out, self._n)
+        ensure_sums_to_zero(x, z, out)
 
         return out
 
@@ -182,11 +175,7 @@ class LogitICARGibbs(GibbsBase):
 
     def _configure(self, Q, hparams):
         super()._configure(Q, hparams)
-
-        random_state = self.rng.integers(low=0, high=2 ** 63)
-        self.dists.pg = PolyaGamma(random_state)
-        self.dists.mvnorm = GaussianMarkovRandomField(random_state)
-        self.dists.eta_post = _EtaICARPosterior(self.fixed.Q, self.rng)
+        self.dists.eta_posterior = _EtaICARPosterior(self.fixed.Q)
 
     def _update_omega_a(self):
         """Update the latent variable ``omega_a``.
@@ -199,8 +188,9 @@ class LogitICARGibbs(GibbsBase):
         self.state.exists = self.fixed.obs + not_obs_occupancy
         self.state.W = self.W[self.state.exists]
         b = self.state.W @ self.state.alpha
-        self.dists.pg.rvs_arr(np.ones_like(b), b, b)
-        self.state.omega_a = b
+        self.state.omega_a = polyagamma(
+            1, b, disable_checks=True, random_state=self.rng
+        )
 
     def _update_omega_b(self):
         """Update the latent variable ``omega_b``.
@@ -209,8 +199,9 @@ class LogitICARGibbs(GibbsBase):
         covariates.
         """
         b = self.X @ self.state.beta + self.state.spatial
-        self.dists.pg.rvs_arr(self.fixed.ones, b, b)
-        self.state.omega_b = b
+        self.state.omega_b = polyagamma(
+            1, b, disable_checks=True, random_state=self.rng
+        )
 
     def _update_tau(self):
         eta = self.state.eta
@@ -220,7 +211,9 @@ class LogitICARGibbs(GibbsBase):
     def _update_eta(self):
         omega = self.state.omega_b
         b = self.state.k - (omega * (self.X @ self.state.beta))
-        self.state.eta = self.dists.eta_post.rvs(b, omega, self.state.tau)
+        self.state.eta = self.dists.eta_posterior.rvs(
+            b, omega, self.state.tau, self.rng
+        )
         self.state.spatial = self.state.eta
 
     def _update_alpha(self):
@@ -228,7 +221,7 @@ class LogitICARGibbs(GibbsBase):
         y = self.y[self.state.exists] - 0.5
         A = (WT * self.state.omega_a) @ WT.T + self.fixed.a_prec
         b = WT @ y + self.fixed.a_prec_by_mu
-        self.state.alpha = self.dists.mvnorm.rvs(b, A)
+        self.state.alpha = precision_mvnorm(b, A, random_state=self.rng)
 
     def _update_beta(self):
         spat = self.state.spatial
@@ -236,7 +229,7 @@ class LogitICARGibbs(GibbsBase):
         XT = self.X.T
         A = (XT * omega) @ self.X + self.fixed.b_prec
         b = XT @ (self.state.k - (omega * spat)) + self.fixed.b_prec_by_mu
-        self.state.beta = self.dists.mvnorm.rvs(b, A)
+        self.state.beta = precision_mvnorm(b, A, random_state=self.rng)
 
     def _update_z(self):
         """Update the occupancy state of each site."""
@@ -280,9 +273,6 @@ class _EtaRSRPosterior:
     ----------
     Q : np.ndarray
         RSR precision matrix.
-    random_gen : numpy.random.Generator
-        Instance of numpy's Generator class, which exposes a number of random
-        number generating methods.
 
     Methods
     -------
@@ -324,21 +314,20 @@ class _EtaRSRPosterior:
            :math:`\mathbf{x}`
     """
 
-    def __init__(self, Q, K, random_gen):
+    def __init__(self, Q, K):
         s, u = np.linalg.eigh(Q)
         self._Q = Q
         self._eigen = u * np.sqrt(s)
         self._KT = K.T
-        self._rng = random_gen
         self._n = Q.shape[0]
         self._n_plus_k = self._n + K.shape[0]
 
-    def rvs(self, b, omega, tau):
+    def rvs(self, b, omega, tau, random_state):
         """Generate a random draw from this distribution."""
         factor1 = self._KT * np.sqrt(omega)
         factor2 = sqrt(tau) * self._eigen
 
-        eps = self._rng.standard_normal(self._n_plus_k)
+        eps = random_state.standard_normal(self._n_plus_k)
         rnorm1 = factor1 @ eps[self._n:]
         rnorm2 = factor2 @ eps[:self._n]
         out = b + rnorm1 + rnorm2
@@ -467,8 +456,8 @@ class LogitRSRGibbs(LogitICARGibbs):
             del self.fixed.tau_shape
             self.fixed.tau_shape = 0.5 + 0.5 * self.fixed.q
 
-        del self.dists.eta_post
-        self.dists.eta_post = _EtaRSRPosterior(self.fixed.Q, K, self.rng)
+        del self.dists.eta_posterior
+        self.dists.eta_posterior = _EtaRSRPosterior(self.fixed.Q, K)
 
     def _initialize_default_start(self, state):
         state = super()._initialize_default_start(state)
@@ -490,5 +479,7 @@ class LogitRSRGibbs(LogitICARGibbs):
         K = self.fixed.K
         omega = self.state.omega_b
         b = K.T @ (self.state.k - omega * (self.X @ self.state.beta))
-        self.state.eta = self.dists.eta_post.rvs(b, omega, self.state.tau)
+        self.state.eta = self.dists.eta_posterior.rvs(
+            b, omega, self.state.tau, self.rng
+        )
         self.state.spatial = K @ self.state.eta
