@@ -238,7 +238,9 @@ class ProbitRSRGibbs(GibbsBase):
         b = self.fixed.b_prec_by_mu + self.X.T @ (
             self.state.omega_b - self.state.spatial - self.state.eps
         )
-        self.state.beta = precision_mvnorm(b, self.fixed.XTX_plus_bprec, self.rng)
+        self.state.beta = precision_mvnorm(
+            b, self.fixed.XTX_plus_bprec, self.rng
+        )
 
     def _update_z(self):
         no = self.fixed.not_obs
