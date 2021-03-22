@@ -21,6 +21,7 @@ repos:
       - id: check-toml
       - id: check-yaml
       - id: trailing-whitespace
+        exclude: ^occuspytial/.*\.c$
       - id: end-of-file-fixer
       - id: fix-encoding-pragma
         args: ["--remove"]
@@ -41,5 +42,5 @@ repos:
             "--docstring-convention=numpy",
             "--max-line-length=79",
             "--per-file-ignores=__init__.py:F401",
-            "--extend-exclude=setup.py,build,docs/conf.py,examples,dist,htmlcov,.ipynb_checkpoints,.pytest_cache,occuspytial/*.c"
+            "--extend-exclude=setup.py,build,docs/conf.py,examples,dist,htmlcov,.ipynb_checkpoints,.pytest_cache"
           ]
