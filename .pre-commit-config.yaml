@@ -21,6 +21,7 @@ repos:
       - id: check-toml
       - id: check-yaml
       - id: trailing-whitespace
+        exclude: ^occuspytial/.*\.c$
       - id: end-of-file-fixer
       - id: fix-encoding-pragma
         args: ["--remove"]

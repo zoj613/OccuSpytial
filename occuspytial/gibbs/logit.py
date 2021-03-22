@@ -2,7 +2,7 @@ from math import sqrt
 
 import numpy as np
 from numpy.linalg import multi_dot
-from polyagamma import polyagamma
+from polyagamma import random_polyagamma
 from scipy.linalg import solve_triangular
 from scipy.sparse import block_diag
 from scipy.sparse.linalg import minres
@@ -188,7 +188,7 @@ class LogitICARGibbs(GibbsBase):
         self.state.exists = self.fixed.obs + not_obs_occupancy
         self.state.W = self.W[self.state.exists]
         b = self.state.W @ self.state.alpha
-        self.state.omega_a = polyagamma(
+        self.state.omega_a = random_polyagamma(
             1, b, disable_checks=True, random_state=self.rng
         )
 
@@ -199,7 +199,7 @@ class LogitICARGibbs(GibbsBase):
         covariates.
         """
         b = self.X @ self.state.beta + self.state.spatial
-        self.state.omega_b = polyagamma(
+        self.state.omega_b = random_polyagamma(
             1, b, disable_checks=True, random_state=self.rng
         )
 
